@@ -1,6 +1,21 @@
 
+-- Fix security issues with database functions and views
 
--- Create a function to create or get existing direct message chat between two users
+-- 1. Fix the handle_new_user function to have a secure search_path
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, username)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', ''),
+    COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1))
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+
+-- 2. Fix the create_or_get_dm_chat function to have a secure search_path
 CREATE OR REPLACE FUNCTION create_or_get_dm_chat(user1_id uuid, user2_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -40,19 +55,9 @@ BEGIN
 END;
 $$;
 
--- Add RLS policy for users to call the function
-CREATE POLICY "Users can create DM chats" ON chats
-FOR INSERT 
-TO authenticated
-WITH CHECK (auth.uid() = created_by);
+-- 3. Recreate the chat_summaries view without SECURITY DEFINER
+DROP VIEW IF EXISTS public.chat_summaries;
 
--- Update messages RLS to allow updating (for message status, etc.)
-CREATE POLICY "Users can update their own messages" ON messages
-FOR UPDATE 
-TO authenticated
-USING (auth.uid() = sender_id);
-
--- Create a view for chat summaries with last message info
 CREATE VIEW public.chat_summaries AS
 SELECT 
     c.id,
@@ -85,8 +90,3 @@ WHERE EXISTS (
 
 -- Grant access to the view
 GRANT SELECT ON public.chat_summaries TO authenticated;
-
--- Add index for better performance
-CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages(chat_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_chat_participants_user ON chat_participants(user_id);
-
