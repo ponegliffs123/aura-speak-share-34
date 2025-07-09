@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LogOut, Settings, User } from 'lucide-react';
+import { LogOut, Settings, User, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,13 +11,19 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useNavigate } from 'react-router-dom';
 
 export function UserMenu() {
   const { signOut } = useAuth();
   const { profile } = useProfile();
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleSwitchAccount = () => {
+    navigate('/auth');
   };
 
   return (
@@ -48,6 +54,13 @@ export function UserMenu() {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuItem 
+          onClick={handleSwitchAccount}
+          className="text-blue-400 hover:bg-blue-900/20"
+        >
+          <UserPlus className="mr-2 h-4 w-4" />
+          <span>Switch Account</span>
+        </DropdownMenuItem>
         <DropdownMenuItem 
           onClick={handleSignOut}
           className="text-red-400 hover:bg-red-900/20"

@@ -1,9 +1,11 @@
+
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Phone, Video, Camera, Mic, Send, Paperclip, Smile, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MessageBubble from './MessageBubble';
 import MediaPicker from './MediaPicker';
+import EmojiPicker from './EmojiPicker';
 
 interface Message {
   id: string;
@@ -26,6 +28,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const contact = {
@@ -53,14 +56,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     },
     {
       id: '3',
-      text: 'That\'s awesome! I should start working out too',
+      text: 'That\'s awesome! I should start working out too 😅',
       timestamp: '2:32 PM',
       sent: false,
       type: 'text' as const
     },
     {
       id: '4',
-      text: 'Check out this cool photo I took!',
+      text: 'Check out this cool photo I took! 📷✨',
       timestamp: '2:33 PM',
       sent: true,
       type: 'text' as const
@@ -99,8 +102,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     }
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 relative">
       {/* Header */}
       <div className="bg-black/20 backdrop-blur-lg border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between">
@@ -173,6 +180,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         />
       )}
 
+      {/* Emoji Picker */}
+      {showEmojiPicker && (
+        <EmojiPicker
+          onEmojiSelect={handleEmojiSelect}
+          onClose={() => setShowEmojiPicker(false)}
+        />
+      )}
+
       {/* Input Area */}
       <div className="bg-black/20 backdrop-blur-lg border-t border-white/10 p-4">
         <div className="flex items-center space-x-2">
@@ -205,7 +220,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white hover:bg-white/10"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`absolute right-1 top-1/2 transform -translate-y-1/2 text-white hover:bg-white/10 ${
+                showEmojiPicker ? 'text-purple-400' : ''
+              }`}
             >
               <Smile className="h-4 w-4" />
             </Button>
