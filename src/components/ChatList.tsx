@@ -1,7 +1,21 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageSquare, Camera, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+
+interface Chat {
+  id: string;
+  name: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  avatar: string;
+  online: boolean;
+  lastMessageType: string;
+  isGroup?: boolean;
+}
 
 interface ChatListProps {
   onSelectChat: (chatId: string) => void;
@@ -9,49 +23,44 @@ interface ChatListProps {
 }
 
 const ChatList: React.FC<ChatListProps> = ({ onSelectChat, searchQuery }) => {
-  const chats = [
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      lastMessage: 'Hey! How are you doing?',
-      time: '2:30 PM',
-      unread: 2,
-      avatar: 'SJ',
-      online: true,
-      lastMessageType: 'text'
-    },
-    {
-      id: '2',
-      name: 'Mike Chen',
-      lastMessage: 'Sent a photo',
-      time: '1:15 PM',
-      unread: 0,
-      avatar: 'MC',
-      online: false,
-      lastMessageType: 'photo'
-    },
-    {
-      id: '3',
-      name: 'Emma Wilson',
-      lastMessage: 'Voice message',
-      time: '12:45 PM',
-      unread: 1,
-      avatar: 'EW',
-      online: true,
-      lastMessageType: 'voice'
-    },
-    {
-      id: '4',
-      name: 'Team Alpha',
-      lastMessage: 'John: Let\'s meet tomorrow',
-      time: '11:20 AM',
-      unread: 5,
-      avatar: 'TA',
-      online: false,
-      lastMessageType: 'text',
-      isGroup: true
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      fetchChats();
     }
-  ];
+  }, [user]);
+
+  const fetchChats = async () => {
+    try {
+      // Fetch chats that the user participates in
+      const { data: chatParticipants, error } = await supabase
+        .from('chat_participants')
+        .select(`
+          chat_id,
+          chats (
+            id,
+            name,
+            is_group,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      // For now, we'll show empty state since there are no real chats yet
+      setChats([]);
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+      setChats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -68,6 +77,26 @@ const ChatList: React.FC<ChatListProps> = ({ onSelectChat, searchQuery }) => {
         return null;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="px-4 pb-20 flex items-center justify-center h-32">
+        <div className="text-white/60">Loading chats...</div>
+      </div>
+    );
+  }
+
+  if (filteredChats.length === 0) {
+    return (
+      <div className="px-4 pb-20 flex flex-col items-center justify-center h-64">
+        <MessageSquare className="h-12 w-12 text-white/30 mb-4" />
+        <h3 className="text-lg font-semibold text-white mb-2">No conversations yet</h3>
+        <p className="text-white/60 text-center">
+          Start a conversation by adding contacts and sending your first message.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pb-20">

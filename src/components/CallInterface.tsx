@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Speaker } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 interface CallInterfaceProps {
   contact: {
@@ -19,8 +20,14 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
   const [isVideoOn, setIsVideoOn] = useState(contact.callType === 'video');
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [hasPermissions, setHasPermissions] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
+    // Request media permissions when call starts
+    requestMediaPermissions();
+
     const timer = setTimeout(() => {
       setIsConnected(true);
     }, 3000);
@@ -34,8 +41,72 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
     return () => {
       clearTimeout(timer);
       clearInterval(durationTimer);
+      // Clean up media stream when component unmounts
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
     };
   }, [isConnected]);
+
+  const requestMediaPermissions = async () => {
+    try {
+      const constraints = {
+        audio: true,
+        video: contact.callType === 'video'
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setMediaStream(stream);
+      setHasPermissions(true);
+      
+      console.log('Media permissions granted:', {
+        audio: stream.getAudioTracks().length > 0,
+        video: stream.getVideoTracks().length > 0
+      });
+
+      toast({
+        title: "Media access granted",
+        description: `${contact.callType === 'video' ? 'Camera and microphone' : 'Microphone'} access enabled.`,
+      });
+    } catch (error) {
+      console.error('Error accessing media devices:', error);
+      setHasPermissions(false);
+      
+      toast({
+        title: "Media access denied",
+        description: "Please allow camera and microphone access to make calls.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleMute = () => {
+    if (mediaStream) {
+      const audioTracks = mediaStream.getAudioTracks();
+      audioTracks.forEach(track => {
+        track.enabled = isMuted; // Toggle the enabled state
+      });
+    }
+    setIsMuted(!isMuted);
+  };
+
+  const toggleVideo = () => {
+    if (mediaStream && contact.callType === 'video') {
+      const videoTracks = mediaStream.getVideoTracks();
+      videoTracks.forEach(track => {
+        track.enabled = isVideoOn; // Toggle the enabled state
+      });
+    }
+    setIsVideoOn(!isVideoOn);
+  };
+
+  const handleEndCall = () => {
+    // Stop all media tracks
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+    }
+    onEndCall();
+  };
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -66,6 +137,15 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
         </div>
       )}
 
+      {/* Media Permission Warning */}
+      {!hasPermissions && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-500/20 backdrop-blur-lg border border-red-500/30 rounded-lg p-3">
+          <p className="text-sm text-white">
+            Media access required for {contact.callType} calls
+          </p>
+        </div>
+      )}
+
       {/* Call Info */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8">
         <div className="text-center mb-8">
@@ -88,7 +168,7 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
         <div className="flex items-center justify-center space-x-6 mt-auto">
           {/* Mute */}
           <Button
-            onClick={() => setIsMuted(!isMuted)}
+            onClick={toggleMute}
             variant="ghost"
             size="icon"
             className={`w-14 h-14 rounded-full ${
@@ -104,7 +184,7 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
 
           {/* End Call */}
           <Button
-            onClick={onEndCall}
+            onClick={handleEndCall}
             variant="ghost"
             size="icon"
             className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600"
@@ -133,7 +213,7 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
         {contact.callType === 'video' && (
           <div className="flex items-center justify-center space-x-4 mt-6">
             <Button
-              onClick={() => setIsVideoOn(!isVideoOn)}
+              onClick={toggleVideo}
               variant="ghost"
               size="icon"
               className={`w-12 h-12 rounded-full ${
