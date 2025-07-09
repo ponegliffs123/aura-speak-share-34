@@ -38,6 +38,13 @@ export type Database = {
             foreignKeyName: "chat_participants_chat_id_fkey"
             columns: ["chat_id"]
             isOneToOne: false
+            referencedRelation: "chat_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_participants_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
             referencedRelation: "chats"
             referencedColumns: ["id"]
           },
@@ -139,6 +146,13 @@ export type Database = {
             foreignKeyName: "messages_chat_id_fkey"
             columns: ["chat_id"]
             isOneToOne: false
+            referencedRelation: "chat_summaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
             referencedRelation: "chats"
             referencedColumns: ["id"]
           },
@@ -179,10 +193,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      chat_summaries: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          id: string | null
+          is_group: boolean | null
+          last_message: string | null
+          last_message_time: string | null
+          last_message_type: string | null
+          name: string | null
+          unread_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name?: never
+          id?: string | null
+          is_group?: boolean | null
+          last_message?: never
+          last_message_time?: never
+          last_message_type?: never
+          name?: string | null
+          unread_count?: never
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: never
+          id?: string | null
+          is_group?: boolean | null
+          last_message?: never
+          last_message_time?: never
+          last_message_type?: never
+          name?: string | null
+          unread_count?: never
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      create_or_get_dm_chat: {
+        Args: { user1_id: string; user2_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

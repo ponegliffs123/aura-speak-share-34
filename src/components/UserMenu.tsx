@@ -20,10 +20,17 @@ export function UserMenu() {
 
   const handleSignOut = async () => {
     await signOut();
+    navigate('/auth');
   };
 
-  const handleSwitchAccount = () => {
+  const handleSwitchAccount = async () => {
+    await signOut();
     navigate('/auth');
+  };
+
+  const getInitials = () => {
+    const name = profile?.full_name || profile?.username || 'User';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
@@ -31,7 +38,7 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
           <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-semibold">
-            {profile?.full_name?.[0] || profile?.username?.[0] || 'U'}
+            {getInitials()}
           </div>
         </Button>
       </DropdownMenuTrigger>
