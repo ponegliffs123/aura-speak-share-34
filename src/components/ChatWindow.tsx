@@ -1,10 +1,20 @@
-
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Phone, Video, Camera, Mic, Send, Paperclip, Smile, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MessageBubble from './MessageBubble';
 import MediaPicker from './MediaPicker';
+
+interface Message {
+  id: string;
+  text?: string;
+  mediaUrl?: string;
+  timestamp: string;
+  sent: boolean;
+  type: 'text' | 'image' | 'video' | 'audio' | 'file';
+  fileName?: string;
+  fileSize?: string;
+}
 
 interface ChatWindowProps {
   chatId: string;
@@ -26,41 +36,41 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     lastSeen: 'online'
   };
 
-  const messages = [
+  const messages: Message[] = [
     {
       id: '1',
       text: 'Hey! How are you doing?',
       timestamp: '2:30 PM',
       sent: false,
-      type: 'text'
+      type: 'text' as const
     },
     {
       id: '2',
       text: 'I\'m doing great! Just finished my workout 💪',
       timestamp: '2:31 PM',
       sent: true,
-      type: 'text'
+      type: 'text' as const
     },
     {
       id: '3',
       text: 'That\'s awesome! I should start working out too',
       timestamp: '2:32 PM',
       sent: false,
-      type: 'text'
+      type: 'text' as const
     },
     {
       id: '4',
       text: 'Check out this cool photo I took!',
       timestamp: '2:33 PM',
       sent: true,
-      type: 'text'
+      type: 'text' as const
     },
     {
       id: '5',
       mediaUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=300&fit=crop',
       timestamp: '2:34 PM',
       sent: true,
-      type: 'image'
+      type: 'image' as const
     }
   ];
 
