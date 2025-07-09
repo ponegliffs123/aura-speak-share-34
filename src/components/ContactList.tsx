@@ -12,8 +12,6 @@ interface Contact {
   username: string | null;
   full_name: string | null;
   avatar_url: string | null;
-  online?: boolean;
-  status?: string;
 }
 
 interface ContactListProps {
@@ -29,27 +27,27 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
   const [showUserSearch, setShowUserSearch] = useState(false);
 
   const fetchContacts = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url')
         .neq('id', user.id)
-        .limit(20);
+        .limit(50);
 
-      if (error) throw error;
-      
-      // Add mock online status for display purposes
-      const contactsWithStatus = (data || []).map(contact => ({
-        ...contact,
-        online: Math.random() > 0.5, // Random online status for demo
-        status: Math.random() > 0.5 ? 'Available' : 'Last seen recently'
-      }));
-      
-      setContacts(contactsWithStatus);
+      if (error) {
+        console.error('Error fetching contacts:', error);
+        setContacts([]);
+      } else {
+        setContacts(data || []);
+      }
     } catch (error) {
       console.error('Error fetching contacts:', error);
+      setContacts([]);
     } finally {
       setLoading(false);
     }
@@ -74,16 +72,18 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
   };
 
   const handleStartChat = async (contact: Contact) => {
-    const chatId = await createOrGetDMChat(contact.id);
-    if (chatId) {
-      // You can add navigation to the chat here if needed
-      console.log('Chat created/found:', chatId);
+    try {
+      const chatId = await createOrGetDMChat(contact.id);
+      if (chatId) {
+        console.log('Chat created/found:', chatId);
+      }
+    } catch (error) {
+      console.error('Error creating chat:', error);
     }
   };
 
   const handleChatCreated = (chatId: string) => {
     setShowUserSearch(false);
-    // Navigate to the chat if needed
     console.log('New chat created:', chatId);
   };
 
@@ -113,9 +113,9 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
         {filteredContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64">
             <UserPlus className="h-12 w-12 text-white/30 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No contacts yet</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">No contacts found</h3>
             <p className="text-white/60 text-center mb-4">
-              Click the + button above to add contacts and start conversations.
+              {searchQuery ? 'No contacts match your search.' : 'Click the + button above to find and add contacts.'}
             </p>
           </div>
         ) : (
@@ -129,9 +129,6 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-semibold">
                     {getInitials(contact)}
                   </div>
-                  {contact.online && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900"></div>
-                  )}
                 </div>
                 
                 <div className="flex-1">
@@ -139,7 +136,6 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
                   {contact.username && (
                     <p className="text-sm text-white/60">@{contact.username}</p>
                   )}
-                  <p className="text-xs text-white/50">{contact.status}</p>
                 </div>
                 
                 <div className="flex items-center space-x-2">

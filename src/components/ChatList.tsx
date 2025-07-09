@@ -60,9 +60,14 @@ const ChatList: React.FC<ChatListProps> = ({ onSelectChat, searchQuery, selected
         {filteredChats.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64">
             <MessageSquare className="h-12 w-12 text-white/30 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No conversations yet</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">
+              {searchQuery ? 'No matching conversations' : 'No conversations yet'}
+            </h3>
             <p className="text-white/60 text-center mb-4">
-              Start a conversation by clicking the "New Conversation" button above.
+              {searchQuery 
+                ? 'Try adjusting your search terms.'
+                : 'Start a conversation by clicking the "New Conversation" button above.'
+              }
             </p>
           </div>
         ) : (

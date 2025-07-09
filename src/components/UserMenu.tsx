@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LogOut, Settings, User, UserPlus } from 'lucide-react';
+import { LogOut, Settings, User, UserPlus, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -23,9 +23,20 @@ export function UserMenu() {
     navigate('/auth');
   };
 
-  const handleSwitchAccount = async () => {
-    await signOut();
+  const handleSwitchAccount = () => {
+    // Just navigate to auth without signing out completely
     navigate('/auth');
+  };
+
+  const handleProfile = () => {
+    // Navigate to profile page or open profile modal
+    console.log('Profile clicked');
+    // You can implement a profile modal or page here
+  };
+
+  const handleSettings = () => {
+    console.log('Settings clicked');
+    // You can implement a settings modal or page here
   };
 
   const getDisplayName = () => {
@@ -56,7 +67,7 @@ export function UserMenu() {
           </div>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-black/80 backdrop-blur-lg border-white/10">
+      <DropdownMenuContent align="end" className="bg-black/80 backdrop-blur-lg border-white/10 w-64">
         <div className="px-3 py-2">
           <p className="text-sm font-medium text-white">
             {getDisplayName()}
@@ -66,25 +77,38 @@ export function UserMenu() {
           </p>
         </div>
         <DropdownMenuSeparator className="bg-white/10" />
-        <DropdownMenuItem className="text-white hover:bg-white/10">
+        <DropdownMenuItem 
+          onClick={handleProfile}
+          className="text-white hover:bg-white/10 cursor-pointer"
+        >
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
-        <DropdownMenuItem className="text-white hover:bg-white/10">
+        <DropdownMenuItem 
+          onClick={handleProfile}
+          className="text-white hover:bg-white/10 cursor-pointer"
+        >
+          <Camera className="mr-2 h-4 w-4" />
+          <span>Change Profile Picture</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={handleSettings}
+          className="text-white hover:bg-white/10 cursor-pointer"
+        >
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/10" />
         <DropdownMenuItem 
           onClick={handleSwitchAccount}
-          className="text-blue-400 hover:bg-blue-900/20"
+          className="text-blue-400 hover:bg-blue-900/20 cursor-pointer"
         >
           <UserPlus className="mr-2 h-4 w-4" />
           <span>Switch Account</span>
         </DropdownMenuItem>
         <DropdownMenuItem 
           onClick={handleSignOut}
-          className="text-red-400 hover:bg-red-900/20"
+          className="text-red-400 hover:bg-red-900/20 cursor-pointer"
         >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign out</span>

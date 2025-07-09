@@ -9,6 +9,7 @@ import ChatWindow from '@/components/ChatWindow';
 import ContactList from '@/components/ContactList';
 import CallInterface from '@/components/CallInterface';
 import { UserMenu } from '@/components/UserMenu';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
@@ -114,6 +115,7 @@ const Index = () => {
                     <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
                       <Settings className="h-5 w-5" />
                     </Button>
+                    <ThemeToggle />
                     <UserMenu />
                   </div>
                 </div>
@@ -185,6 +187,7 @@ const Index = () => {
                   <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
                     <Settings className="h-5 w-5" />
                   </Button>
+                  <ThemeToggle />
                   <UserMenu />
                 </div>
               </div>
