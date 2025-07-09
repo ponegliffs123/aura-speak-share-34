@@ -64,7 +64,12 @@ const Index = () => {
   };
 
   const handleStartCall = (contact: any, type: 'voice' | 'video') => {
-    setCallData({ contact, type });
+    setCallData({ 
+      contact: { 
+        ...contact, 
+        callType: type 
+      } 
+    });
     setIsInCall(true);
   };
 
@@ -89,7 +94,6 @@ const Index = () => {
     return (
       <CallInterface
         contact={callData.contact}
-        type={callData.type}
         onEndCall={handleEndCall}
       />
     );
