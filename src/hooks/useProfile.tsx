@@ -44,6 +44,24 @@ export const useProfile = () => {
           theme_preference: (data.theme_preference as 'light' | 'dark' | 'system') || 'system'
         };
         setProfile(profileData);
+      } else {
+        // If no profile exists, create one with basic info
+        const newProfile = {
+          id: user.id,
+          username: user.email?.split('@')[0] || null,
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+          avatar_url: null,
+          phone_number: null,
+          theme_preference: 'system' as const
+        };
+
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert(newProfile);
+
+        if (!insertError) {
+          setProfile(newProfile);
+        }
       }
     } catch (error) {
       console.error('Error fetching profile:', error);

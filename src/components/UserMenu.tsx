@@ -14,7 +14,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useNavigate } from 'react-router-dom';
 
 export function UserMenu() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
 
@@ -28,9 +28,23 @@ export function UserMenu() {
     navigate('/auth');
   };
 
+  const getDisplayName = () => {
+    if (profile?.full_name) return profile.full_name;
+    if (profile?.username) return profile.username;
+    if (user?.email) return user.email.split('@')[0];
+    return 'User';
+  };
+
   const getInitials = () => {
-    const name = profile?.full_name || profile?.username || 'User';
+    const name = getDisplayName();
+    if (name === 'User') return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getUserIdentifier = () => {
+    if (profile?.username) return `@${profile.username}`;
+    if (user?.email) return user.email;
+    return '';
   };
 
   return (
@@ -45,10 +59,10 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="bg-black/80 backdrop-blur-lg border-white/10">
         <div className="px-3 py-2">
           <p className="text-sm font-medium text-white">
-            {profile?.full_name || profile?.username || 'User'}
+            {getDisplayName()}
           </p>
           <p className="text-xs text-white/60">
-            {profile?.username ? `@${profile.username}` : ''}
+            {getUserIdentifier()}
           </p>
         </div>
         <DropdownMenuSeparator className="bg-white/10" />
