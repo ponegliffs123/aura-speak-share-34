@@ -1,0 +1,61 @@
+
+import React from 'react';
+import { LogOut, Settings, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
+
+export function UserMenu() {
+  const { signOut } = useAuth();
+  const { profile } = useProfile();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-semibold">
+            {profile?.full_name?.[0] || profile?.username?.[0] || 'U'}
+          </div>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="bg-black/80 backdrop-blur-lg border-white/10">
+        <div className="px-3 py-2">
+          <p className="text-sm font-medium text-white">
+            {profile?.full_name || profile?.username || 'User'}
+          </p>
+          <p className="text-xs text-white/60">
+            {profile?.username ? `@${profile.username}` : ''}
+          </p>
+        </div>
+        <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuItem className="text-white hover:bg-white/10">
+          <User className="mr-2 h-4 w-4" />
+          <span>Profile</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-white hover:bg-white/10">
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuItem 
+          onClick={handleSignOut}
+          className="text-red-400 hover:bg-red-900/20"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Sign out</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

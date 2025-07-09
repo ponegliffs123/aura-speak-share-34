@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Phone, MessageSquare, Users, Settings, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { UserMenu } from '@/components/UserMenu';
 import ChatList from './ChatList';
 import ChatWindow from './ChatWindow';
 import ContactList from './ContactList';
@@ -36,7 +38,7 @@ const AppLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-white transition-colors duration-300">
       {/* Header */}
       <div className="bg-black/20 backdrop-blur-lg border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between max-w-md mx-auto">
@@ -58,6 +60,8 @@ const AppLayout = () => {
             >
               <Plus className="h-5 w-5" />
             </Button>
+            <ThemeToggle />
+            <UserMenu />
           </div>
         </div>
       </div>
