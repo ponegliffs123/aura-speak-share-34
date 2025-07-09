@@ -37,7 +37,14 @@ export const useProfile = () => {
         throw error;
       }
 
-      setProfile(data);
+      if (data) {
+        // Ensure theme_preference is properly typed
+        const profileData: Profile = {
+          ...data,
+          theme_preference: (data.theme_preference as 'light' | 'dark' | 'system') || 'system'
+        };
+        setProfile(profileData);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       toast({
