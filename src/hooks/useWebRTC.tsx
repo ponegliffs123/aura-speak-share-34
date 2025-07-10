@@ -23,6 +23,29 @@ export const useWebRTC = () => {
     ],
   };
 
+  const endCall = useCallback(() => {
+    // Stop local stream
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      setLocalStream(null);
+    }
+
+    // Send call end signal before closing
+    realtimeChannel.current?.sendCallEnd();
+
+    // Close connections
+    webrtcConnection.current?.close();
+    realtimeChannel.current?.close();
+
+    // Reset refs
+    webrtcConnection.current = null;
+    realtimeChannel.current = null;
+
+    setRemoteStream(null);
+    setIsConnected(false);
+    setIsConnecting(false);
+  }, [localStream]);
+
   const initializeWebRTC = useCallback(() => {
     if (!user?.id || webrtcConnection.current) return;
 
@@ -55,7 +78,7 @@ export const useWebRTC = () => {
         endCall();
       }
     });
-  }, [user?.id]);
+  }, [user?.id, endCall]);
 
   const setupRealtimeChannel = useCallback((chatId: string) => {
     if (!user?.id || realtimeChannel.current) return;
@@ -134,14 +157,14 @@ export const useWebRTC = () => {
     realtimeChannel.current.onCallEnd(() => {
       endCall();
     });
-  }, [user?.id, initializeWebRTC]);
+  }, [user?.id, initializeWebRTC, endCall]);
 
   const startCall = useCallback(async (contactId: string, chatId: string, callType: 'voice' | 'video') => {
     try {
       console.log('Starting call:', { contactId, chatId, callType });
       setIsConnecting(true);
       
-      // Get user media
+      // Get user media first
       const constraints = {
         audio: true,
         video: callType === 'video'
@@ -151,15 +174,26 @@ export const useWebRTC = () => {
       setLocalStream(stream);
       console.log('Got local stream:', stream);
 
-      // Initialize connections
-      initializeWebRTC();
-      setupRealtimeChannel(chatId);
+      // Initialize WebRTC connection
+      if (!webrtcConnection.current) {
+        initializeWebRTC();
+      }
       
       // Set remote user ID
       webrtcConnection.current?.setRemoteUserId(contactId);
 
-      // Wait a bit for channel to be ready
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Initialize realtime channel
+      if (!realtimeChannel.current) {
+        setupRealtimeChannel(chatId);
+      }
+
+      // Wait longer for channel to be ready and ensure WebRTC is initialized
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify both connections are ready
+      if (!webrtcConnection.current || !realtimeChannel.current) {
+        throw new Error('Connections failed to initialize');
+      }
 
       // Add tracks to peer connection
       stream.getTracks().forEach(track => {
@@ -167,18 +201,20 @@ export const useWebRTC = () => {
       });
 
       // Create and send offer
-      const offer = await webrtcConnection.current?.createOffer();
-      if (offer && realtimeChannel.current) {
-        realtimeChannel.current.sendCallOffer({
-          sdp: offer.sdp || '',
-          type: 'offer',
-          from: user?.id || '',
-          to: contactId,
-          callType,
-        });
-      } else {
-        throw new Error('Failed to create offer or realtime channel not ready');
+      const offer = await webrtcConnection.current.createOffer();
+      if (!offer) {
+        throw new Error('Failed to create offer');
       }
+
+      realtimeChannel.current.sendCallOffer({
+        sdp: offer.sdp || '',
+        type: 'offer',
+        from: user?.id || '',
+        to: contactId,
+        callType,
+      });
+
+      console.log('Sent offer to:', contactId);
 
       toast({
         title: "Call initiated",
@@ -187,37 +223,22 @@ export const useWebRTC = () => {
 
     } catch (error) {
       console.error('Error starting call:', error);
+      
+      // Clean up on error
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        setLocalStream(null);
+      }
+      
       toast({
         title: "Call failed",
-        description: "Failed to start call. Please check your permissions.",
+        description: error instanceof Error ? error.message : "Failed to start call. Please check your permissions.",
         variant: "destructive",
       });
       setIsConnecting(false);
     }
-  }, [user?.id, initializeWebRTC, setupRealtimeChannel, toast]);
+  }, [user?.id, initializeWebRTC, setupRealtimeChannel, toast, localStream]);
 
-  const endCall = useCallback(() => {
-    // Stop local stream
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      setLocalStream(null);
-    }
-
-    // Send call end signal before closing
-    realtimeChannel.current?.sendCallEnd();
-
-    // Close connections
-    webrtcConnection.current?.close();
-    realtimeChannel.current?.close();
-
-    // Reset refs
-    webrtcConnection.current = null;
-    realtimeChannel.current = null;
-
-    setRemoteStream(null);
-    setIsConnected(false);
-    setIsConnecting(false);
-  }, [localStream]);
 
   const toggleMute = useCallback(() => {
     if (localStream) {
