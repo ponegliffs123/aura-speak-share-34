@@ -238,6 +238,14 @@ export type Database = {
         Args: { user1_id: string; user2_id: string }
         Returns: string
       }
+      is_chat_creator: {
+        Args: { chat_id_param: string; user_id_param: string }
+        Returns: boolean
+      }
+      is_chat_participant: {
+        Args: { chat_id_param: string; user_id_param: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
