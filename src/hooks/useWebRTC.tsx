@@ -198,22 +198,29 @@ export const useWebRTC = () => {
       // Initialize connections with proper sequencing
       console.log('Initializing WebRTC...');
       await initializeWebRTC();
-      console.log('WebRTC initialized, setting up realtime channel...');
+      console.log('WebRTC initialized, current connection:', !!webrtcConnection.current);
+      
+      console.log('Setting up realtime channel...');
       setupRealtimeChannel(chatId);
+      console.log('Realtime channel setup, current channel:', !!realtimeChannel.current);
       
       // Wait a moment for realtime channel to initialize
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      console.log('Checking connections:', {
+      console.log('Final connection check:', {
         webrtc: !!webrtcConnection.current,
-        realtime: !!realtimeChannel.current
+        realtime: !!realtimeChannel.current,
+        userId: user?.id,
+        chatId: chatId
       });
       
       if (!webrtcConnection.current) {
+        console.error('WebRTC connection failed to initialize');
         throw new Error('Failed to initialize WebRTC connection');
       }
       
       if (!realtimeChannel.current) {
+        console.error('Realtime channel failed to initialize');
         throw new Error('Failed to initialize realtime channel');
       }
 
