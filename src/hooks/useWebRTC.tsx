@@ -237,10 +237,28 @@ export const useWebRTC = () => {
 
     } catch (error) {
       console.error('Call failed:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       endCall();
+      
+      // More specific error messages
+      let errorMessage = "Could not start call.";
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Camera/microphone access denied. Please allow permissions and try again.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No camera or microphone found.";
+      } else if (error.message.includes('WebRTC')) {
+        errorMessage = "WebRTC connection failed. Please check your internet connection.";
+      } else if (error.message.includes('realtime')) {
+        errorMessage = "Realtime channel failed. Please try again.";
+      }
+      
       toast({
         title: "Call failed",
-        description: "Could not start call. Check permissions and try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
