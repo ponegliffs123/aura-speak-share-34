@@ -24,48 +24,86 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const { sendMessage } = useChats();
   const { user } = useAuth();
 
-  // Fetch chat info
+  // Fetch chat info with better error handling and fallback
   useEffect(() => {
     const fetchChatInfo = async () => {
-      if (!chatId) return;
+      if (!chatId || !user) return;
       
       try {
         setChatInfoLoading(true);
         console.log('Fetching chat info for:', chatId);
         
-        const { data, error } = await supabase
+        // First try to get from chat_summaries view
+        const { data: summaryData, error: summaryError } = await supabase
           .from('chat_summaries')
           .select('*')
           .eq('id', chatId)
           .single();
 
-        if (error) {
-          console.error('Error fetching chat info:', error);
-          // Fallback: try to get chat from chats table directly
-          const { data: chatData, error: chatError } = await supabase
-            .from('chats')
-            .select('*')
-            .eq('id', chatId)
-            .single();
+        if (!summaryError && summaryData) {
+          console.log('Chat info from summary:', summaryData);
+          setChatInfo(summaryData);
+          setChatInfoLoading(false);
+          return;
+        }
+
+        console.log('Summary not found, trying direct chat query');
+
+        // Fallback: try to get chat info directly with participants
+        const { data: chatData, error: chatError } = await supabase
+          .from('chats')
+          .select(`
+            *,
+            chat_participants!inner(
+              user_id,
+              profiles!inner(id, username, full_name)
+            )
+          `)
+          .eq('id', chatId)
+          .single();
+        
+        if (!chatError && chatData) {
+          console.log('Chat info from direct query:', chatData);
           
-          if (!chatError && chatData) {
-            setChatInfo({
-              ...chatData,
-              display_name: chatData.name || 'Unknown Chat'
-            });
-          }
+          // For DM chats, find the other participant
+          const otherParticipant = chatData.chat_participants.find(
+            (p: any) => p.user_id !== user.id
+          );
+          
+          const displayName = chatData.is_group 
+            ? chatData.name || 'Group Chat'
+            : otherParticipant?.profiles?.full_name || 
+              otherParticipant?.profiles?.username || 
+              'Unknown User';
+
+          setChatInfo({
+            ...chatData,
+            display_name: displayName
+          });
         } else {
-          setChatInfo(data);
+          console.error('Error fetching chat info:', chatError);
+          // Set minimal chat info to prevent crashes
+          setChatInfo({
+            id: chatId,
+            display_name: 'Chat',
+            is_group: false
+          });
         }
       } catch (error) {
         console.error('Unexpected error fetching chat info:', error);
+        // Set minimal chat info to prevent crashes
+        setChatInfo({
+          id: chatId,
+          display_name: 'Chat',
+          is_group: false
+        });
       } finally {
         setChatInfoLoading(false);
       }
     };
 
     fetchChatInfo();
-  }, [chatId]);
+  }, [chatId, user]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -92,8 +130,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // Show loading only if both chat info and messages are loading
-  if (chatInfoLoading || (messagesLoading && !chatInfo)) {
+  // Show loading only while fetching chat info
+  if (chatInfoLoading) {
     return (
       <div className="flex flex-col h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 items-center justify-center">
         <div className="text-white/60">Loading chat...</div>
@@ -103,13 +141,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
   const contact = chatInfo ? {
     id: chatId,
-    name: chatInfo.display_name || 'Unknown',
+    name: chatInfo.display_name || 'Chat',
     avatar: getInitials(chatInfo.display_name),
     online: true,
     lastSeen: 'online'
   } : {
     id: chatId,
-    name: 'Unknown Chat',
+    name: 'Chat',
     avatar: '?',
     online: false,
     lastSeen: 'offline'

@@ -40,7 +40,7 @@ export const useChats = () => {
     }
 
     try {
-      console.log('Fetching chats...');
+      console.log('Fetching chats for user:', user.id);
       const { data, error } = await supabase
         .from('chat_summaries')
         .select('*')
@@ -48,7 +48,6 @@ export const useChats = () => {
 
       if (error) {
         console.error('Error fetching chats:', error);
-        // Don't show toast for policy errors to prevent spam
         if (!error.message.includes('policy') && !error.message.includes('recursion')) {
           toast({
             title: "Error",
@@ -58,7 +57,7 @@ export const useChats = () => {
         }
         setChats([]);
       } else {
-        console.log('Chats fetched successfully:', data?.length || 0);
+        console.log('Chats fetched successfully:', data?.length || 0, data);
         setChats(data || []);
       }
     } catch (error) {
@@ -70,10 +69,44 @@ export const useChats = () => {
   };
 
   const createOrGetDMChat = async (otherUserId: string): Promise<string | null> => {
-    if (!user) return null;
+    if (!user) {
+      console.error('No user logged in');
+      return null;
+    }
 
     try {
-      console.log('Creating/getting DM chat with user:', otherUserId);
+      console.log('Creating/getting DM chat between:', user.id, 'and', otherUserId);
+      
+      // First check if chat already exists by querying the database directly
+      const { data: existingChats, error: queryError } = await supabase
+        .from('chats')
+        .select(`
+          id,
+          name,
+          is_group,
+          chat_participants!inner(user_id)
+        `)
+        .eq('is_group', false);
+
+      if (queryError) {
+        console.error('Error querying existing chats:', queryError);
+      } else {
+        console.log('Existing chats:', existingChats);
+        
+        // Find a chat where both users are participants
+        const existingChat = existingChats?.find(chat => {
+          const participantIds = chat.chat_participants.map((p: any) => p.user_id);
+          return participantIds.includes(user.id) && participantIds.includes(otherUserId) && participantIds.length === 2;
+        });
+
+        if (existingChat) {
+          console.log('Found existing chat:', existingChat.id);
+          await fetchChats(); // Refresh chats list
+          return existingChat.id;
+        }
+      }
+
+      // If no existing chat found, create one using the function
       const { data, error } = await supabase.rpc('create_or_get_dm_chat', {
         user1_id: user.id,
         user2_id: otherUserId
@@ -81,23 +114,30 @@ export const useChats = () => {
 
       if (error) {
         console.error('Error creating/getting DM chat:', error);
-        if (!error.message.includes('policy') && !error.message.includes('recursion')) {
-          toast({
-            title: "Error",
-            description: "Failed to create conversation",
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "Error",
+          description: "Failed to create conversation",
+          variant: "destructive",
+        });
         return null;
       }
       
-      console.log('DM chat created/found:', data);
+      console.log('DM chat created/found via function:', data);
+      
+      // Add a small delay to ensure the chat is properly created
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Refresh chats after creating new one
       await fetchChats();
       
       return data;
     } catch (error) {
       console.error('Unexpected error creating/getting DM chat:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create conversation",
+        variant: "destructive",
+      });
       return null;
     }
   };
@@ -106,7 +146,7 @@ export const useChats = () => {
     if (!user) return;
 
     try {
-      console.log('Sending message to chat:', chatId);
+      console.log('Sending message to chat:', chatId, 'content:', content);
       const { error } = await supabase
         .from('messages')
         .insert({
@@ -127,6 +167,8 @@ export const useChats = () => {
         }
       } else {
         console.log('Message sent successfully');
+        // Refresh chats to update last message
+        await fetchChats();
       }
     } catch (error) {
       console.error('Unexpected error sending message:', error);
@@ -149,7 +191,7 @@ export const useChats = () => {
           },
           () => {
             console.log('Messages changed, refreshing chats');
-            fetchChats(); // Refresh chats when messages change
+            fetchChats();
           }
         )
         .on(
@@ -161,7 +203,19 @@ export const useChats = () => {
           },
           () => {
             console.log('Chats changed, refreshing');
-            fetchChats(); // Refresh chats when chats change
+            fetchChats();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'chat_participants',
+          },
+          () => {
+            console.log('Chat participants changed, refreshing');
+            fetchChats();
           }
         )
         .subscribe();
