@@ -49,7 +49,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
         console.log('Summary not found, trying direct chat query');
 
-        // Fallback: get chat info and then separately get participant profiles
+        // Fallback: get chat info directly
         const { data: chatData, error: chatError } = await supabase
           .from('chats')
           .select('*')
@@ -67,41 +67,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
           return;
         }
 
-        // Get chat participants with proper error handling
-        const { data: participantsData, error: participantsError } = await supabase
+        // Get chat participants
+        const { data: participantsData } = await supabase
           .from('chat_participants')
           .select('user_id')
           .eq('chat_id', chatId);
-
-        if (participantsError) {
-          console.error('Error fetching participants:', participantsError);
-          setChatInfo({
-            ...chatData,
-            display_name: chatData.name || 'Chat'
-          });
-          setChatInfoLoading(false);
-          return;
-        }
 
         console.log('Chat participants:', participantsData);
         
         // For DM chats, find the other participant and get their profile
         let displayName = chatData.name || 'Chat';
         
-        if (!chatData.is_group && participantsData) {
+        if (!chatData.is_group && participantsData && participantsData.length > 0) {
           const otherParticipantId = participantsData.find(
             (p: any) => p.user_id !== user.id
           )?.user_id;
           
           if (otherParticipantId) {
             // Fetch the other participant's profile separately
-            const { data: profileData, error: profileError } = await supabase
+            const { data: profileData } = await supabase
               .from('profiles')
               .select('id, username, full_name')
               .eq('id', otherParticipantId)
-              .single();
+              .maybeSingle();
 
-            if (!profileError && profileData) {
+            if (profileData) {
               displayName = profileData.full_name || 
                           profileData.username || 
                           'Unknown User';

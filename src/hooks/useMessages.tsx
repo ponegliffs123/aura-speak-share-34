@@ -40,7 +40,7 @@ export const useMessages = (chatId: string | null) => {
 
       if (error) {
         console.error('Error fetching messages:', error);
-        // Don't show toast for policy errors to prevent spam
+        // Only show toast for non-policy errors
         if (!error.message.includes('policy') && !error.message.includes('recursion')) {
           toast({
             title: "Error",
@@ -77,13 +77,20 @@ export const useMessages = (chatId: string | null) => {
             filter: `chat_id=eq.${chatId}`,
           },
           (payload) => {
-            console.log('New message received:', payload.new);
-            setMessages(prev => [...prev, payload.new as Message]);
+            console.log('New message received via realtime:', payload.new);
+            const newMessage = payload.new as Message;
+            setMessages(prev => {
+              // Check if message already exists to avoid duplicates
+              const exists = prev.some(msg => msg.id === newMessage.id);
+              if (exists) return prev;
+              return [...prev, newMessage];
+            });
           }
         )
         .subscribe();
 
       return () => {
+        console.log('Cleaning up messages subscription');
         supabase.removeChannel(channel);
       };
     } else {
