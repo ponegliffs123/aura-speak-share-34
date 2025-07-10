@@ -67,13 +67,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
           return;
         }
 
-        // Get chat participants
+        // Get chat participants with proper error handling
         const { data: participantsData, error: participantsError } = await supabase
           .from('chat_participants')
-          .select(`
-            user_id,
-            profiles(id, username, full_name)
-          `)
+          .select('user_id')
           .eq('chat_id', chatId);
 
         if (participantsError) {
@@ -88,18 +85,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
         console.log('Chat participants:', participantsData);
         
-        // For DM chats, find the other participant
+        // For DM chats, find the other participant and get their profile
         let displayName = chatData.name || 'Chat';
         
         if (!chatData.is_group && participantsData) {
-          const otherParticipant = participantsData.find(
+          const otherParticipantId = participantsData.find(
             (p: any) => p.user_id !== user.id
-          );
+          )?.user_id;
           
-          if (otherParticipant?.profiles) {
-            displayName = otherParticipant.profiles.full_name || 
-                        otherParticipant.profiles.username || 
-                        'Unknown User';
+          if (otherParticipantId) {
+            // Fetch the other participant's profile separately
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('id, username, full_name')
+              .eq('id', otherParticipantId)
+              .single();
+
+            if (!profileError && profileData) {
+              displayName = profileData.full_name || 
+                          profileData.username || 
+                          'Unknown User';
+            }
           }
         }
 
