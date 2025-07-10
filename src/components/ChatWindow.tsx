@@ -22,6 +22,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const [message, setMessage] = useState('');
   const [chatInfo, setChatInfo] = useState<any>(null);
   const [chatInfoLoading, setChatInfoLoading] = useState(true);
+  const [otherParticipantId, setOtherParticipantId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { messages, loading: messagesLoading } = useMessages(chatId);
   const { sendMessage } = useChats();
@@ -82,18 +83,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         
         // For DM chats, find the other participant and get their profile
         let displayName = chatData.name || 'Chat';
+        let otherUserId = null;
         
         if (!chatData.is_group && participantsData && participantsData.length > 0) {
-          const otherParticipantId = participantsData.find(
+          otherUserId = participantsData.find(
             (p: any) => p.user_id !== user.id
           )?.user_id;
           
-          if (otherParticipantId) {
+          if (otherUserId) {
+            console.log('Found other participant:', otherUserId);
+            setOtherParticipantId(otherUserId);
+            
             // Fetch the other participant's profile separately
             const { data: profileData } = await supabase
               .from('profiles')
               .select('id, username, full_name')
-              .eq('id', otherParticipantId)
+              .eq('id', otherUserId)
               .maybeSingle();
 
             if (profileData) {
@@ -178,13 +183,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   }
 
   const contact = chatInfo ? {
-    id: chatId,
+    id: otherParticipantId || chatId, // Use actual user ID for DM calls, fallback to chat ID for group chats
     name: chatInfo.display_name || 'Chat',
     avatar: getInitials(chatInfo.display_name),
     online: true,
     lastSeen: 'online'
   } : {
-    id: chatId,
+    id: otherParticipantId || chatId,
     name: 'Chat',
     avatar: '?',
     online: false,
