@@ -56,7 +56,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
             *,
             chat_participants!inner(
               user_id,
-              profiles!inner(id, username, full_name)
+              profiles!chat_participants_user_id_fkey(id, username, full_name)
             )
           `)
           .eq('id', chatId)
