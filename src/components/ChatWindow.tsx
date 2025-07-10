@@ -197,6 +197,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     lastSeen: 'offline'
   };
 
+  console.log('Contact object for call:', contact);
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Header */}
