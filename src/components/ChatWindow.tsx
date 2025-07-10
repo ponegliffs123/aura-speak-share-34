@@ -80,6 +80,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
           .eq('chat_id', chatId);
 
         console.log('Chat participants:', participantsData);
+        console.log('Current user ID:', user.id);
         
         // For DM chats, find the other participant and get their profile
         let displayName = chatData.name || 'Chat';
