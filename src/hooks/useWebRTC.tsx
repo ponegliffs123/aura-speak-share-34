@@ -90,11 +90,15 @@ export const useWebRTC = () => {
     });
 
     webrtcConnection.current.onConnectionStateChange((state) => {
+      console.log('WebRTC connection state changed to:', state);
       setIsConnected(state === 'connected');
-      setIsConnecting(state === 'connecting');
+      setIsConnecting(state === 'connecting' || state === 'new');
       
-      if (state === 'disconnected' || state === 'failed') {
-        endCall();
+      // Only end call on failed state, not disconnected during normal flow
+      // And add a delay to prevent race conditions during initial setup
+      if (state === 'failed') {
+        console.log('WebRTC connection failed, ending call');
+        setTimeout(() => endCall(), 1000);
       }
     });
   }, [user?.id, endCall]);
