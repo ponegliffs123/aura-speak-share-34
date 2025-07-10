@@ -2,6 +2,7 @@
 import React from 'react';
 import { Download, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import MessageStatusIndicator from './MessageStatusIndicator';
 
 interface Message {
   id: string;
@@ -12,6 +13,7 @@ interface Message {
   type: 'text' | 'image' | 'video' | 'audio' | 'file';
   fileName?: string;
   fileSize?: string;
+  status?: 'sending' | 'delivered' | 'read';
 }
 
 interface MessageBubbleProps {
@@ -103,8 +105,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     <div className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
       <div className={bubbleClasses}>
         {renderContent()}
-        <div className={`text-xs mt-1 ${isFromMe ? 'text-white/70' : 'text-white/50'}`}>
-          {message.timestamp}
+        <div className={`flex items-center justify-between mt-1`}>
+          <div className={`text-xs ${isFromMe ? 'text-white/70' : 'text-white/50'}`}>
+            {message.timestamp}
+          </div>
+          <MessageStatusIndicator 
+            status={message.status || 'delivered'} 
+            isOwnMessage={isFromMe} 
+          />
         </div>
       </div>
     </div>

@@ -72,7 +72,7 @@ const Index = () => {
         ...contact, 
         callType: type 
       },
-      chatId: selectedChatId || 'temp-call-id'
+      chatId: contact.chatId || selectedChatId || 'temp-call-id'
     });
     setIsInCall(true);
   };

@@ -4,10 +4,12 @@ import { ArrowLeft, Phone, Video, Send, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MessageBubble from './MessageBubble';
+import TypingIndicator from './TypingIndicator';
 import { useMessages } from '@/hooks/useMessages';
 import { useChats } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { useMessageReads } from '@/hooks/useMessageReads';
+import { useMessageStatus } from '@/hooks/useMessageStatus';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ChatWindowProps {
@@ -25,6 +27,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const { sendMessage } = useChats();
   const { user } = useAuth();
   const { markMessagesAsRead } = useMessageReads();
+  const { sendTypingStatus, typingUsers } = useMessageStatus(chatId);
 
   // Fetch chat info with better error handling and fallback
   useEffect(() => {
@@ -137,6 +140,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const handleSendMessage = async () => {
     if (message.trim() && user && chatId) {
       console.log('Sending message:', message.trim());
+      sendTypingStatus(false); // Stop typing when sending
       await sendMessage(chatId, message.trim());
       setMessage('');
     }
@@ -146,6 +150,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMessage(e.target.value);
+    // Send typing indicator when user starts typing
+    if (e.target.value.length > 0) {
+      sendTypingStatus(true);
+    } else {
+      sendTypingStatus(false);
     }
   };
 
@@ -266,6 +280,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
             />
           ))
         )}
+        <TypingIndicator 
+          isVisible={typingUsers.length > 0} 
+          userNames={['Someone']} // You can enhance this to show actual names
+        />
         <div ref={messagesEndRef} />
       </div>
 
@@ -275,7 +293,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
           <div className="flex-1">
             <Input
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={handleMessageChange}
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
               className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-purple-400"

@@ -86,16 +86,26 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
     }
   };
 
-  const handleStartCall = (contact: Contact, type: 'voice' | 'video') => {
-    console.log(`Starting ${type} call with:`, contact.id);
-    const contactForCall = {
-      id: contact.id,
-      name: getDisplayName(contact),
-      avatar: getInitials(contact),
-      online: true,
-      lastSeen: 'online'
-    };
-    onStartCall(contactForCall, type);
+  const handleStartCall = async (contact: Contact, type: 'voice' | 'video') => {
+    try {
+      console.log(`Starting ${type} call with user:`, contact.id);
+      
+      // Create or get the DM chat first
+      const chatId = await createOrGetDMChat(contact.id);
+      
+      const contactForCall = {
+        id: contact.id, // This is the actual user ID
+        name: getDisplayName(contact),
+        avatar: getInitials(contact),
+        online: true,
+        lastSeen: 'online',
+        chatId: chatId // Include the chat ID
+      };
+      
+      onStartCall(contactForCall, type);
+    } catch (error) {
+      console.error('Error setting up call:', error);
+    }
   };
 
   const handleChatCreated = (chatId: string) => {
