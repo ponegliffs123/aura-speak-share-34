@@ -18,31 +18,53 @@ interface ChatWindowProps {
 const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) => {
   const [message, setMessage] = useState('');
   const [chatInfo, setChatInfo] = useState<any>(null);
+  const [chatInfoLoading, setChatInfoLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { messages, loading } = useMessages(chatId);
+  const { messages, loading: messagesLoading } = useMessages(chatId);
   const { sendMessage } = useChats();
   const { user } = useAuth();
 
   // Fetch chat info
   useEffect(() => {
     const fetchChatInfo = async () => {
+      if (!chatId) return;
+      
       try {
+        setChatInfoLoading(true);
+        console.log('Fetching chat info for:', chatId);
+        
         const { data, error } = await supabase
           .from('chat_summaries')
           .select('*')
           .eq('id', chatId)
           .single();
 
-        if (error) throw error;
-        setChatInfo(data);
+        if (error) {
+          console.error('Error fetching chat info:', error);
+          // Fallback: try to get chat from chats table directly
+          const { data: chatData, error: chatError } = await supabase
+            .from('chats')
+            .select('*')
+            .eq('id', chatId)
+            .single();
+          
+          if (!chatError && chatData) {
+            setChatInfo({
+              ...chatData,
+              display_name: chatData.name || 'Unknown Chat'
+            });
+          }
+        } else {
+          setChatInfo(data);
+        }
       } catch (error) {
-        console.error('Error fetching chat info:', error);
+        console.error('Unexpected error fetching chat info:', error);
+      } finally {
+        setChatInfoLoading(false);
       }
     };
 
-    if (chatId) {
-      fetchChatInfo();
-    }
+    fetchChatInfo();
   }, [chatId]);
 
   // Auto-scroll to bottom when new messages arrive
@@ -51,7 +73,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (message.trim() && user) {
+    if (message.trim() && user && chatId) {
+      console.log('Sending message:', message.trim());
       await sendMessage(chatId, message.trim());
       setMessage('');
     }
@@ -69,21 +92,28 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // Show loading only if both chat info and messages are loading
+  if (chatInfoLoading || (messagesLoading && !chatInfo)) {
+    return (
+      <div className="flex flex-col h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 items-center justify-center">
+        <div className="text-white/60">Loading chat...</div>
+      </div>
+    );
+  }
+
   const contact = chatInfo ? {
     id: chatId,
     name: chatInfo.display_name || 'Unknown',
     avatar: getInitials(chatInfo.display_name),
     online: true,
     lastSeen: 'online'
-  } : null;
-
-  if (loading || !contact) {
-    return (
-      <div className="flex flex-col h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 items-center justify-center">
-        <div className="text-white/60">Loading messages...</div>
-      </div>
-    );
-  }
+  } : {
+    id: chatId,
+    name: 'Unknown Chat',
+    avatar: '?',
+    online: false,
+    lastSeen: 'offline'
+  };
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -103,7 +133,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-semibold text-white">
                 {contact.avatar}
               </div>
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-gray-900"></div>
+              {contact.online && (
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-gray-900"></div>
+              )}
             </div>
             <div>
               <h2 className="font-semibold text-white">{contact.name}</h2>
@@ -141,7 +173,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
       {/* Messages */}
       <div className="flex-1 p-4 overflow-y-auto space-y-4 min-h-0">
-        {messages.length === 0 ? (
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-white/60">Loading messages...</div>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-lg font-semibold text-white mx-auto mb-4">

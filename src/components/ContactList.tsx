@@ -33,6 +33,7 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
     }
 
     try {
+      console.log('Fetching contacts...');
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url')
@@ -43,6 +44,7 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
         console.error('Error fetching contacts:', error);
         setContacts([]);
       } else {
+        console.log('Contacts fetched:', data?.length || 0);
         setContacts(data || []);
       }
     } catch (error) {
@@ -73,13 +75,27 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
 
   const handleStartChat = async (contact: Contact) => {
     try {
+      console.log('Starting chat with contact:', contact.id);
       const chatId = await createOrGetDMChat(contact.id);
       if (chatId) {
         console.log('Chat created/found:', chatId);
+        // The chat selection will be handled by the parent component
       }
     } catch (error) {
       console.error('Error creating chat:', error);
     }
+  };
+
+  const handleStartCall = (contact: Contact, type: 'voice' | 'video') => {
+    console.log(`Starting ${type} call with:`, contact.id);
+    const contactForCall = {
+      id: contact.id,
+      name: getDisplayName(contact),
+      avatar: getInitials(contact),
+      online: true,
+      lastSeen: 'online'
+    };
+    onStartCall(contactForCall, type);
   };
 
   const handleChatCreated = (chatId: string) => {
@@ -126,7 +142,7 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
                 className="flex items-center space-x-3 p-4 bg-white/5 hover:bg-white/10 transition-all duration-200 rounded-xl"
               >
                 <div className="relative">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-semibold">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-semibold text-white">
                     {getInitials(contact)}
                   </div>
                 </div>
@@ -144,24 +160,25 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
                     size="icon"
                     onClick={() => handleStartChat(contact)}
                     className="text-white hover:bg-white/10"
+                    title="Start Chat"
                   >
                     <MessageSquare className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onStartCall(contact, 'voice')}
+                    onClick={() => handleStartCall(contact, 'voice')}
                     className="text-green-400 hover:bg-green-400/20"
+                    title="Voice Call"
                   >
                     <Phone className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onStartCall(contact, 'video')}
+                    onClick={() => handleStartCall(contact, 'video')}
                     className="text-blue-400 hover:bg-blue-400/20"
-                  >
-                    <Video className="h-4 w-4" />
+                    title="Video Call"
                   </Button>
                 </div>
               </div>

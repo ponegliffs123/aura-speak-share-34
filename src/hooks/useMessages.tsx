@@ -23,24 +23,39 @@ export const useMessages = (chatId: string | null) => {
   const { toast } = useToast();
 
   const fetchMessages = async () => {
-    if (!chatId || !user) return;
+    if (!chatId || !user) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoading(true);
+      console.log('Fetching messages for chat:', chatId);
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('chat_id', chatId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setMessages(data || []);
+      if (error) {
+        console.error('Error fetching messages:', error);
+        // Don't show toast for policy errors to prevent spam
+        if (!error.message.includes('policy') && !error.message.includes('recursion')) {
+          toast({
+            title: "Error",
+            description: "Failed to load messages",
+            variant: "destructive",
+          });
+        }
+        setMessages([]);
+      } else {
+        console.log('Messages fetched successfully:', data?.length || 0);
+        setMessages(data || []);
+      }
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load messages",
-        variant: "destructive",
-      });
+      console.error('Unexpected error fetching messages:', error);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -62,6 +77,7 @@ export const useMessages = (chatId: string | null) => {
             filter: `chat_id=eq.${chatId}`,
           },
           (payload) => {
+            console.log('New message received:', payload.new);
             setMessages(prev => [...prev, payload.new as Message]);
           }
         )
@@ -70,6 +86,9 @@ export const useMessages = (chatId: string | null) => {
       return () => {
         supabase.removeChannel(channel);
       };
+    } else {
+      setMessages([]);
+      setLoading(false);
     }
   }, [chatId, user]);
 
