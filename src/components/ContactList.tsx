@@ -179,6 +179,8 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
                     onClick={() => handleStartCall(contact, 'video')}
                     className="text-blue-400 hover:bg-blue-400/20"
                     title="Video Call"
+                  >
+                    <Video className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
