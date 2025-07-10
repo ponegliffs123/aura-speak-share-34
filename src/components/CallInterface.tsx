@@ -36,10 +36,12 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, chatId, onEndCal
     remoteStream,
   } = useWebRTC();
 
-  // Start the call when component mounts
+  // Start the call when component mounts (only once)
   useEffect(() => {
-    startCall(contact.id, chatId, contact.callType);
-  }, [contact.id, chatId, contact.callType, startCall]);
+    if (!isConnecting && !isConnected) {
+      startCall(contact.id, chatId, contact.callType);
+    }
+  }, []); // Empty dependency array to run only once
 
   // Call duration timer
   useEffect(() => {

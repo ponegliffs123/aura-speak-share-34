@@ -24,6 +24,8 @@ export const useWebRTC = () => {
   };
 
   const endCall = useCallback(() => {
+    console.log('Ending call...');
+    
     // Stop local stream
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
@@ -237,7 +239,7 @@ export const useWebRTC = () => {
       });
       setIsConnecting(false);
     }
-  }, [user?.id, initializeWebRTC, setupRealtimeChannel, toast, localStream]);
+  }, [user?.id, initializeWebRTC, setupRealtimeChannel, toast]);
 
 
   const toggleMute = useCallback(() => {
