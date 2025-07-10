@@ -16,7 +16,14 @@ export class WebRTCConnection {
   initialize() {
     if (this.peerConnection) return;
 
-    this.peerConnection = new RTCPeerConnection(this.config);
+    try {
+      console.log('Creating RTCPeerConnection with config:', this.config);
+      this.peerConnection = new RTCPeerConnection(this.config);
+      console.log('RTCPeerConnection created successfully');
+    } catch (error) {
+      console.error('Failed to create RTCPeerConnection:', error);
+      throw new Error(`RTCPeerConnection creation failed: ${error.message}`);
+    }
 
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate && this.onIceCandidateCallback) {

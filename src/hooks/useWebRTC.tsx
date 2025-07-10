@@ -51,7 +51,7 @@ export const useWebRTC = () => {
   const initializeWebRTC = useCallback(async () => {
     if (!user?.id) {
       console.error('No user ID available for WebRTC');
-      return;
+      throw new Error('No user ID available for WebRTC');
     }
     
     // Close existing connection if any
@@ -60,9 +60,16 @@ export const useWebRTC = () => {
       webrtcConnection.current.close();
     }
 
-    console.log('Creating new WebRTC connection');
-    webrtcConnection.current = new WebRTCConnection(rtcConfig, user.id);
-    webrtcConnection.current.initialize();
+    try {
+      console.log('Creating new WebRTC connection');
+      webrtcConnection.current = new WebRTCConnection(rtcConfig, user.id);
+      webrtcConnection.current.initialize();
+      console.log('WebRTC connection initialized successfully');
+    } catch (error) {
+      console.error('WebRTC initialization failed:', error);
+      webrtcConnection.current = null;
+      throw error;
+    }
 
     // Set up WebRTC event handlers
     webrtcConnection.current.onIceCandidate((candidate) => {
