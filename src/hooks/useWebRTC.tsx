@@ -1,23 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
-
-interface CallOffer {
-  sdp: string;
-  type: 'offer' | 'answer';
-  from: string;
-  to: string;
-  callType: 'voice' | 'video';
-}
-
-interface IceCandidate {
-  candidate: string;
-  sdpMLineIndex: number;
-  sdpMid: string;
-  from: string;
-  to: string;
-}
+import { WebRTCConnection } from '@/utils/webrtc-connection';
+import { RealtimeChannel } from '@/utils/realtime-channel';
+import { CallOffer, IceCandidate, WebRTCConfig } from '@/types/webrtc';
 
 export const useWebRTC = () => {
   const { user } = useAuth();
@@ -27,144 +13,133 @@ export const useWebRTC = () => {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const channelRef = useRef<any>(null);
-  const remoteUserIdRef = useRef<string | null>(null);
+  const webrtcConnection = useRef<WebRTCConnection | null>(null);
+  const realtimeChannel = useRef<RealtimeChannel | null>(null);
 
-  const rtcConfig = {
+  const rtcConfig: WebRTCConfig = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
     ],
   };
 
-  const initializePeerConnection = useCallback(() => {
-    if (peerConnection.current) return;
+  const initializeWebRTC = useCallback(() => {
+    if (!user?.id || webrtcConnection.current) return;
 
-    peerConnection.current = new RTCPeerConnection(rtcConfig);
+    webrtcConnection.current = new WebRTCConnection(rtcConfig, user.id);
+    webrtcConnection.current.initialize();
 
-    peerConnection.current.onicecandidate = (event) => {
-      if (event.candidate && channelRef.current && remoteUserIdRef.current) {
-        console.log('Sending ICE candidate:', event.candidate);
-        channelRef.current.send({
-          type: 'broadcast',
-          event: 'ice-candidate',
-          payload: {
-            candidate: event.candidate.candidate,
-            sdpMLineIndex: event.candidate.sdpMLineIndex,
-            sdpMid: event.candidate.sdpMid,
-            from: user?.id,
-            to: remoteUserIdRef.current,
-          },
+    // Set up WebRTC event handlers
+    webrtcConnection.current.onIceCandidate((candidate) => {
+      const remoteUserId = webrtcConnection.current?.getRemoteUserId();
+      if (remoteUserId && realtimeChannel.current) {
+        realtimeChannel.current.sendIceCandidate({
+          candidate: candidate.candidate || '',
+          sdpMLineIndex: candidate.sdpMLineIndex || 0,
+          sdpMid: candidate.sdpMid || '',
+          from: user.id,
+          to: remoteUserId,
         });
       }
-    };
+    });
 
-    peerConnection.current.ontrack = (event) => {
-      setRemoteStream(event.streams[0]);
-    };
+    webrtcConnection.current.onTrack((stream) => {
+      setRemoteStream(stream);
+    });
 
-    peerConnection.current.onconnectionstatechange = () => {
-      const state = peerConnection.current?.connectionState;
+    webrtcConnection.current.onConnectionStateChange((state) => {
       setIsConnected(state === 'connected');
       setIsConnecting(state === 'connecting');
       
       if (state === 'disconnected' || state === 'failed') {
         endCall();
       }
-    };
+    });
   }, [user?.id]);
 
   const setupRealtimeChannel = useCallback((chatId: string) => {
-    if (channelRef.current) return;
+    if (!user?.id || realtimeChannel.current) return;
 
-    channelRef.current = supabase.channel(`call-${chatId}`)
-      .on('broadcast', { event: 'call-offer' }, async (payload) => {
-        const offer: CallOffer = payload.payload;
-        console.log('Received call offer:', offer);
-        
-        if (offer.to === user?.id) {
-          try {
-            remoteUserIdRef.current = offer.from;
-            setIsConnecting(true);
+    realtimeChannel.current = new RealtimeChannel(chatId, user.id);
+    realtimeChannel.current.initialize();
 
-            if (offer.type === 'offer') {
-              // Get user media for the receiver
-              const constraints = {
-                audio: true,
-                video: offer.callType === 'video'
-              };
-              
-              const stream = await navigator.mediaDevices.getUserMedia(constraints);
-              setLocalStream(stream);
-              console.log('Receiver got local stream:', stream);
+    // Set up realtime event handlers
+    realtimeChannel.current.onCallOffer(async (offer: CallOffer) => {
+      if (offer.to === user.id) {
+        try {
+          webrtcConnection.current?.setRemoteUserId(offer.from);
+          setIsConnecting(true);
 
-              // Initialize peer connection if not already done
-              if (!peerConnection.current) {
-                initializePeerConnection();
-              }
+          if (offer.type === 'offer') {
+            // Get user media for the receiver
+            const constraints = {
+              audio: true,
+              video: offer.callType === 'video'
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            setLocalStream(stream);
+            console.log('Receiver got local stream:', stream);
 
-              // Add tracks to peer connection
-              stream.getTracks().forEach(track => {
-                console.log('Receiver adding track:', track.kind);
-                peerConnection.current?.addTrack(track, stream);
-              });
-
-              await peerConnection.current!.setRemoteDescription(new RTCSessionDescription({
-                type: offer.type,
-                sdp: offer.sdp,
-              }));
-
-              const answer = await peerConnection.current!.createAnswer();
-              await peerConnection.current!.setLocalDescription(answer);
-              console.log('Created answer:', answer);
-
-              channelRef.current.send({
-                type: 'broadcast',
-                event: 'call-offer',
-                payload: {
-                  sdp: answer.sdp,
-                  type: 'answer',
-                  from: user?.id,
-                  to: offer.from,
-                  callType: offer.callType,
-                },
-              });
-              console.log('Sent answer to:', offer.from);
-            } else if (offer.type === 'answer' && peerConnection.current) {
-              await peerConnection.current.setRemoteDescription(new RTCSessionDescription({
-                type: offer.type,
-                sdp: offer.sdp,
-              }));
-              console.log('Set remote description with answer');
+            // Initialize WebRTC if not already done
+            if (!webrtcConnection.current) {
+              initializeWebRTC();
             }
-          } catch (error) {
-            console.error('Error handling call offer:', error);
-            setIsConnecting(false);
+
+            // Add tracks to peer connection
+            stream.getTracks().forEach(track => {
+              webrtcConnection.current?.addTrack(track, stream);
+            });
+
+            await webrtcConnection.current?.setRemoteDescription({
+              type: offer.type,
+              sdp: offer.sdp,
+            });
+
+            const answer = await webrtcConnection.current?.createAnswer();
+            if (answer) {
+              realtimeChannel.current?.sendCallOffer({
+                sdp: answer.sdp || '',
+                type: 'answer',
+                from: user.id,
+                to: offer.from,
+                callType: offer.callType,
+              });
+            }
+          } else if (offer.type === 'answer') {
+            await webrtcConnection.current?.setRemoteDescription({
+              type: offer.type,
+              sdp: offer.sdp,
+            });
           }
+        } catch (error) {
+          console.error('Error handling call offer:', error);
+          setIsConnecting(false);
         }
-      })
-      .on('broadcast', { event: 'ice-candidate' }, async (payload) => {
-        const candidate: IceCandidate = payload.payload;
-        if (candidate.to === user?.id && peerConnection.current) {
-          await peerConnection.current.addIceCandidate(new RTCIceCandidate({
-            candidate: candidate.candidate,
-            sdpMLineIndex: candidate.sdpMLineIndex,
-            sdpMid: candidate.sdpMid,
-          }));
-        }
-      })
-      .on('broadcast', { event: 'call-end' }, () => {
-        endCall();
-      })
-      .subscribe();
-  }, [user?.id]);
+      }
+    });
+
+    realtimeChannel.current.onIceCandidate(async (candidate: IceCandidate) => {
+      try {
+        await webrtcConnection.current?.addIceCandidate({
+          candidate: candidate.candidate,
+          sdpMLineIndex: candidate.sdpMLineIndex,
+          sdpMid: candidate.sdpMid,
+        });
+      } catch (error) {
+        console.error('Error adding ICE candidate:', error);
+      }
+    });
+
+    realtimeChannel.current.onCallEnd(() => {
+      endCall();
+    });
+  }, [user?.id, initializeWebRTC]);
 
   const startCall = useCallback(async (contactId: string, chatId: string, callType: 'voice' | 'video') => {
     try {
       console.log('Starting call:', { contactId, chatId, callType });
       setIsConnecting(true);
-      remoteUserIdRef.current = contactId;
       
       // Get user media
       const constraints = {
@@ -176,40 +151,33 @@ export const useWebRTC = () => {
       setLocalStream(stream);
       console.log('Got local stream:', stream);
 
-      // Initialize peer connection and setup channel
-      initializePeerConnection();
+      // Initialize connections
+      initializeWebRTC();
       setupRealtimeChannel(chatId);
+      
+      // Set remote user ID
+      webrtcConnection.current?.setRemoteUserId(contactId);
 
       // Wait a bit for channel to be ready
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Add tracks to peer connection
       stream.getTracks().forEach(track => {
-        console.log('Adding track:', track.kind);
-        peerConnection.current?.addTrack(track, stream);
+        webrtcConnection.current?.addTrack(track, stream);
       });
 
-      // Create offer
-      const offer = await peerConnection.current!.createOffer();
-      await peerConnection.current!.setLocalDescription(offer);
-      console.log('Created offer:', offer);
-
-      // Send offer through realtime
-      if (channelRef.current) {
-        channelRef.current.send({
-          type: 'broadcast',
-          event: 'call-offer',
-          payload: {
-            sdp: offer.sdp,
-            type: 'offer',
-            from: user?.id,
-            to: contactId,
-            callType,
-          },
+      // Create and send offer
+      const offer = await webrtcConnection.current?.createOffer();
+      if (offer && realtimeChannel.current) {
+        realtimeChannel.current.sendCallOffer({
+          sdp: offer.sdp || '',
+          type: 'offer',
+          from: user?.id || '',
+          to: contactId,
+          callType,
         });
-        console.log('Sent offer to:', contactId);
       } else {
-        throw new Error('Realtime channel not ready');
+        throw new Error('Failed to create offer or realtime channel not ready');
       }
 
       toast({
@@ -226,7 +194,7 @@ export const useWebRTC = () => {
       });
       setIsConnecting(false);
     }
-  }, [user?.id, initializePeerConnection, setupRealtimeChannel, toast]);
+  }, [user?.id, initializeWebRTC, setupRealtimeChannel, toast]);
 
   const endCall = useCallback(() => {
     // Stop local stream
@@ -235,27 +203,21 @@ export const useWebRTC = () => {
       setLocalStream(null);
     }
 
-    // Close peer connection
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
+    // Send call end signal before closing
+    realtimeChannel.current?.sendCallEnd();
 
-    // Clean up realtime channel
-    if (channelRef.current) {
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'call-end',
-        payload: { from: user?.id },
-      });
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
+    // Close connections
+    webrtcConnection.current?.close();
+    realtimeChannel.current?.close();
+
+    // Reset refs
+    webrtcConnection.current = null;
+    realtimeChannel.current = null;
 
     setRemoteStream(null);
     setIsConnected(false);
     setIsConnecting(false);
-  }, [localStream, user?.id]);
+  }, [localStream]);
 
   const toggleMute = useCallback(() => {
     if (localStream) {
