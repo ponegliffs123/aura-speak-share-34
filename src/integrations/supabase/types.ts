@@ -101,6 +101,38 @@ export type Database = {
         }
         Relationships: []
       }
+      message_reads: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           chat_id: string
@@ -112,6 +144,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           message_type: string | null
+          read_at: string | null
           sender_id: string
           updated_at: string | null
         }
@@ -125,6 +158,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_type?: string | null
+          read_at?: string | null
           sender_id: string
           updated_at?: string | null
         }
@@ -138,6 +172,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_type?: string | null
+          read_at?: string | null
           sender_id?: string
           updated_at?: string | null
         }
@@ -206,30 +241,6 @@ export type Database = {
           unread_count: number | null
           updated_at: string | null
         }
-        Insert: {
-          created_at?: string | null
-          display_name?: never
-          id?: string | null
-          is_group?: boolean | null
-          last_message?: never
-          last_message_time?: never
-          last_message_type?: never
-          name?: string | null
-          unread_count?: never
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          display_name?: never
-          id?: string | null
-          is_group?: boolean | null
-          last_message?: never
-          last_message_time?: never
-          last_message_type?: never
-          name?: string | null
-          unread_count?: never
-          updated_at?: string | null
-        }
         Relationships: []
       }
     }
@@ -245,6 +256,10 @@ export type Database = {
       is_chat_participant: {
         Args: { chat_id_param: string; user_id_param: string }
         Returns: boolean
+      }
+      mark_messages_as_read: {
+        Args: { chat_id_param: string }
+        Returns: undefined
       }
     }
     Enums: {

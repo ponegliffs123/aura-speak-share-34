@@ -32,6 +32,7 @@ const AppLayout = () => {
     return (
       <CallInterface
         contact={callContact}
+        chatId={activeChatId || 'temp-call-id'}
         onEndCall={handleEndCall}
       />
     );

@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Speaker } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useWebRTC } from '@/hooks/useWebRTC';
 
 interface CallInterfaceProps {
   contact: {
@@ -11,100 +12,78 @@ interface CallInterfaceProps {
     avatar: string;
     callType: 'voice' | 'video';
   };
+  chatId: string;
   onEndCall: () => void;
 }
 
-const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => {
-  const [isConnected, setIsConnected] = useState(false);
+const CallInterface: React.FC<CallInterfaceProps> = ({ contact, chatId, onEndCall }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(contact.callType === 'video');
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
-  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-  const [hasPermissions, setHasPermissions] = useState(false);
   const { toast } = useToast();
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  
+  const {
+    startCall,
+    endCall,
+    toggleMute: webRTCToggleMute,
+    toggleVideo: webRTCToggleVideo,
+    isConnected,
+    isConnecting,
+    localStream,
+    remoteStream,
+  } = useWebRTC();
 
+  // Start the call when component mounts
   useEffect(() => {
-    // Request media permissions when call starts
-    requestMediaPermissions();
+    startCall(contact.id, chatId, contact.callType);
+  }, [contact.id, chatId, contact.callType, startCall]);
 
-    const timer = setTimeout(() => {
-      setIsConnected(true);
-    }, 3000);
-
-    const durationTimer = setInterval(() => {
-      if (isConnected) {
+  // Call duration timer
+  useEffect(() => {
+    let durationTimer: NodeJS.Timeout;
+    
+    if (isConnected) {
+      durationTimer = setInterval(() => {
         setCallDuration(prev => prev + 1);
-      }
-    }, 1000);
+      }, 1000);
+    }
 
     return () => {
-      clearTimeout(timer);
-      clearInterval(durationTimer);
-      // Clean up media stream when component unmounts
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
+      if (durationTimer) {
+        clearInterval(durationTimer);
       }
     };
   }, [isConnected]);
 
-  const requestMediaPermissions = async () => {
-    try {
-      const constraints = {
-        audio: true,
-        video: contact.callType === 'video'
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setMediaStream(stream);
-      setHasPermissions(true);
-      
-      console.log('Media permissions granted:', {
-        audio: stream.getAudioTracks().length > 0,
-        video: stream.getVideoTracks().length > 0
-      });
-
-      toast({
-        title: "Media access granted",
-        description: `${contact.callType === 'video' ? 'Camera and microphone' : 'Microphone'} access enabled.`,
-      });
-    } catch (error) {
-      console.error('Error accessing media devices:', error);
-      setHasPermissions(false);
-      
-      toast({
-        title: "Media access denied",
-        description: "Please allow camera and microphone access to make calls.",
-        variant: "destructive",
-      });
+  // Set up local video stream
+  useEffect(() => {
+    if (localStream && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
     }
-  };
+  }, [localStream]);
+
+  // Set up remote video stream
+  useEffect(() => {
+    if (remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
 
   const toggleMute = () => {
-    if (mediaStream) {
-      const audioTracks = mediaStream.getAudioTracks();
-      audioTracks.forEach(track => {
-        track.enabled = isMuted; // Toggle the enabled state
-      });
-    }
+    webRTCToggleMute();
     setIsMuted(!isMuted);
   };
 
   const toggleVideo = () => {
-    if (mediaStream && contact.callType === 'video') {
-      const videoTracks = mediaStream.getVideoTracks();
-      videoTracks.forEach(track => {
-        track.enabled = isVideoOn; // Toggle the enabled state
-      });
-    }
+    webRTCToggleVideo();
     setIsVideoOn(!isVideoOn);
   };
 
   const handleEndCall = () => {
-    // Stop all media tracks
-    if (mediaStream) {
-      mediaStream.getTracks().forEach(track => track.stop());
-    }
+    endCall();
     onEndCall();
   };
 
@@ -122,26 +101,41 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
       {/* Video Background (if video call) */}
       {contact.callType === 'video' && (
         <div className="absolute inset-0">
-          <div className="w-full h-full bg-gradient-to-br from-purple-800 to-blue-800 flex items-center justify-center">
-            <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold">
-              {contact.avatar}
-            </div>
-          </div>
+          {/* Remote video */}
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover bg-gradient-to-br from-purple-800 to-blue-800"
+          />
           
-          {/* Self Video (small window) */}
-          <div className="absolute top-4 right-4 w-24 h-32 bg-black/50 rounded-lg flex items-center justify-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-xs font-bold">
-              ME
+          {/* Fallback when no remote stream */}
+          {!remoteStream && (
+            <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-purple-800 to-blue-800 flex items-center justify-center">
+              <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold">
+                {contact.avatar}
+              </div>
             </div>
+          )}
+          
+          {/* Local Video (small window) */}
+          <div className="absolute top-4 right-4 w-24 h-32 bg-black/50 rounded-lg overflow-hidden">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
       )}
 
-      {/* Media Permission Warning */}
-      {!hasPermissions && (
+      {/* Connection Status Warning */}
+      {!isConnected && !isConnecting && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-500/20 backdrop-blur-lg border border-red-500/30 rounded-lg p-3">
           <p className="text-sm text-white">
-            Media access required for {contact.callType} calls
+            Call failed to connect
           </p>
         </div>
       )}
@@ -157,7 +151,7 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
           
           <h2 className="text-2xl font-bold mb-2">{contact.name}</h2>
           <p className="text-lg text-white/70">
-            {!isConnected ? 'Calling...' : `${formatDuration(callDuration)}`}
+            {isConnecting ? 'Connecting...' : !isConnected ? 'Calling...' : `${formatDuration(callDuration)}`}
           </p>
           <p className="text-sm text-white/50 mt-1">
             {contact.callType === 'video' ? 'Video Call' : 'Voice Call'}
@@ -230,7 +224,7 @@ const CallInterface: React.FC<CallInterfaceProps> = ({ contact, onEndCall }) => 
         )}
 
         {/* Connection Status */}
-        {!isConnected && (
+        {(isConnecting || !isConnected) && (
           <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
             <div className="flex items-center space-x-2">
               <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>

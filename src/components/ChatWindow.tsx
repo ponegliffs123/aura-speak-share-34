@@ -7,6 +7,7 @@ import MessageBubble from './MessageBubble';
 import { useMessages } from '@/hooks/useMessages';
 import { useChats } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
+import { useMessageReads } from '@/hooks/useMessageReads';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ChatWindowProps {
@@ -23,6 +24,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const { messages, loading: messagesLoading } = useMessages(chatId);
   const { sendMessage } = useChats();
   const { user } = useAuth();
+  const { markMessagesAsRead } = useMessageReads();
 
   // Fetch chat info with better error handling and fallback
   useEffect(() => {
@@ -124,6 +126,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Mark messages as read when chat is opened or new messages arrive
+  useEffect(() => {
+    if (chatId && messages.length > 0) {
+      markMessagesAsRead(chatId);
+    }
+  }, [chatId, messages.length, markMessagesAsRead]);
 
   const handleSendMessage = async () => {
     if (message.trim() && user && chatId) {

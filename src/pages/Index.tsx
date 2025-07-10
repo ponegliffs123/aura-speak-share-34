@@ -69,7 +69,8 @@ const Index = () => {
       contact: { 
         ...contact, 
         callType: type 
-      } 
+      },
+      chatId: selectedChatId || 'temp-call-id'
     });
     setIsInCall(true);
   };
@@ -95,6 +96,7 @@ const Index = () => {
     return (
       <CallInterface
         contact={callData.contact}
+        chatId={callData.chatId}
         onEndCall={handleEndCall}
       />
     );
