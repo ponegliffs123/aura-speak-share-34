@@ -49,8 +49,18 @@ export const useWebRTC = () => {
   }, [localStream]);
 
   const initializeWebRTC = useCallback(async () => {
-    if (!user?.id || webrtcConnection.current) return;
+    if (!user?.id) {
+      console.error('No user ID available for WebRTC');
+      return;
+    }
+    
+    // Close existing connection if any
+    if (webrtcConnection.current) {
+      console.log('Closing existing WebRTC connection');
+      webrtcConnection.current.close();
+    }
 
+    console.log('Creating new WebRTC connection');
     webrtcConnection.current = new WebRTCConnection(rtcConfig, user.id);
     webrtcConnection.current.initialize();
 
@@ -83,8 +93,17 @@ export const useWebRTC = () => {
   }, [user?.id, endCall]);
 
   const setupRealtimeChannel = useCallback((chatId: string) => {
-    if (!user?.id || realtimeChannel.current) return;
+    if (!user?.id) {
+      console.error('No user ID available for realtime channel');
+      return;
+    }
+    
+    if (realtimeChannel.current) {
+      console.log('Realtime channel already exists, closing previous one');
+      realtimeChannel.current.close();
+    }
 
+    console.log('Creating new realtime channel for chat:', chatId);
     realtimeChannel.current = new RealtimeChannel(chatId, user.id);
     realtimeChannel.current.initialize();
 
@@ -177,14 +196,25 @@ export const useWebRTC = () => {
       console.log('Got local stream');
 
       // Initialize connections with proper sequencing
+      console.log('Initializing WebRTC...');
       await initializeWebRTC();
+      console.log('WebRTC initialized, setting up realtime channel...');
       setupRealtimeChannel(chatId);
       
       // Wait a moment for realtime channel to initialize
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      if (!webrtcConnection.current || !realtimeChannel.current) {
-        throw new Error('Failed to initialize connections');
+      console.log('Checking connections:', {
+        webrtc: !!webrtcConnection.current,
+        realtime: !!realtimeChannel.current
+      });
+      
+      if (!webrtcConnection.current) {
+        throw new Error('Failed to initialize WebRTC connection');
+      }
+      
+      if (!realtimeChannel.current) {
+        throw new Error('Failed to initialize realtime channel');
       }
 
       // Set remote user and add tracks
