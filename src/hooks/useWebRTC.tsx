@@ -29,6 +29,7 @@ export const useWebRTC = () => {
   
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<any>(null);
+  const remoteUserIdRef = useRef<string | null>(null);
 
   const rtcConfig = {
     iceServers: [
@@ -43,7 +44,8 @@ export const useWebRTC = () => {
     peerConnection.current = new RTCPeerConnection(rtcConfig);
 
     peerConnection.current.onicecandidate = (event) => {
-      if (event.candidate && channelRef.current) {
+      if (event.candidate && channelRef.current && remoteUserIdRef.current) {
+        console.log('Sending ICE candidate:', event.candidate);
         channelRef.current.send({
           type: 'broadcast',
           event: 'ice-candidate',
@@ -52,6 +54,7 @@ export const useWebRTC = () => {
             sdpMLineIndex: event.candidate.sdpMLineIndex,
             sdpMid: event.candidate.sdpMid,
             from: user?.id,
+            to: remoteUserIdRef.current,
           },
         });
       }
@@ -78,27 +81,66 @@ export const useWebRTC = () => {
     channelRef.current = supabase.channel(`call-${chatId}`)
       .on('broadcast', { event: 'call-offer' }, async (payload) => {
         const offer: CallOffer = payload.payload;
-        if (offer.to === user?.id && peerConnection.current) {
-          await peerConnection.current.setRemoteDescription(new RTCSessionDescription({
-            type: offer.type,
-            sdp: offer.sdp,
-          }));
+        console.log('Received call offer:', offer);
+        
+        if (offer.to === user?.id) {
+          try {
+            remoteUserIdRef.current = offer.from;
+            setIsConnecting(true);
 
-          if (offer.type === 'offer') {
-            const answer = await peerConnection.current.createAnswer();
-            await peerConnection.current.setLocalDescription(answer);
+            if (offer.type === 'offer') {
+              // Get user media for the receiver
+              const constraints = {
+                audio: true,
+                video: offer.callType === 'video'
+              };
+              
+              const stream = await navigator.mediaDevices.getUserMedia(constraints);
+              setLocalStream(stream);
+              console.log('Receiver got local stream:', stream);
 
-            channelRef.current.send({
-              type: 'broadcast',
-              event: 'call-offer',
-              payload: {
-                sdp: answer.sdp,
-                type: 'answer',
-                from: user?.id,
-                to: offer.from,
-                callType: offer.callType,
-              },
-            });
+              // Initialize peer connection if not already done
+              if (!peerConnection.current) {
+                initializePeerConnection();
+              }
+
+              // Add tracks to peer connection
+              stream.getTracks().forEach(track => {
+                console.log('Receiver adding track:', track.kind);
+                peerConnection.current?.addTrack(track, stream);
+              });
+
+              await peerConnection.current!.setRemoteDescription(new RTCSessionDescription({
+                type: offer.type,
+                sdp: offer.sdp,
+              }));
+
+              const answer = await peerConnection.current!.createAnswer();
+              await peerConnection.current!.setLocalDescription(answer);
+              console.log('Created answer:', answer);
+
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'call-offer',
+                payload: {
+                  sdp: answer.sdp,
+                  type: 'answer',
+                  from: user?.id,
+                  to: offer.from,
+                  callType: offer.callType,
+                },
+              });
+              console.log('Sent answer to:', offer.from);
+            } else if (offer.type === 'answer' && peerConnection.current) {
+              await peerConnection.current.setRemoteDescription(new RTCSessionDescription({
+                type: offer.type,
+                sdp: offer.sdp,
+              }));
+              console.log('Set remote description with answer');
+            }
+          } catch (error) {
+            console.error('Error handling call offer:', error);
+            setIsConnecting(false);
           }
         }
       })
@@ -120,7 +162,9 @@ export const useWebRTC = () => {
 
   const startCall = useCallback(async (contactId: string, chatId: string, callType: 'voice' | 'video') => {
     try {
+      console.log('Starting call:', { contactId, chatId, callType });
       setIsConnecting(true);
+      remoteUserIdRef.current = contactId;
       
       // Get user media
       const constraints = {
@@ -130,32 +174,43 @@ export const useWebRTC = () => {
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setLocalStream(stream);
+      console.log('Got local stream:', stream);
 
-      // Initialize peer connection
+      // Initialize peer connection and setup channel
       initializePeerConnection();
       setupRealtimeChannel(chatId);
 
+      // Wait a bit for channel to be ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Add tracks to peer connection
       stream.getTracks().forEach(track => {
+        console.log('Adding track:', track.kind);
         peerConnection.current?.addTrack(track, stream);
       });
 
       // Create offer
       const offer = await peerConnection.current!.createOffer();
       await peerConnection.current!.setLocalDescription(offer);
+      console.log('Created offer:', offer);
 
       // Send offer through realtime
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'call-offer',
-        payload: {
-          sdp: offer.sdp,
-          type: 'offer',
-          from: user?.id,
-          to: contactId,
-          callType,
-        },
-      });
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'call-offer',
+          payload: {
+            sdp: offer.sdp,
+            type: 'offer',
+            from: user?.id,
+            to: contactId,
+            callType,
+          },
+        });
+        console.log('Sent offer to:', contactId);
+      } else {
+        throw new Error('Realtime channel not ready');
+      }
 
       toast({
         title: "Call initiated",
