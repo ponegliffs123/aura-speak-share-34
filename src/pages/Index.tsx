@@ -8,6 +8,7 @@ import ChatList from '@/components/ChatList';
 import ChatWindow from '@/components/ChatWindow';
 import ContactList from '@/components/ContactList';
 import CallInterface from '@/components/CallInterface';
+import IncomingCallNotification from '@/components/IncomingCallNotification';
 import { UserMenu } from '@/components/UserMenu';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +23,7 @@ const Index = () => {
   const [callData, setCallData] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showChatWindow, setShowChatWindow] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<any>(null);
 
   // Check if user is authenticated
   useEffect(() => {
