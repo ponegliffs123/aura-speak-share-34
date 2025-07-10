@@ -12,10 +12,12 @@ import IncomingCallNotification from '@/components/IncomingCallNotification';
 import { UserMenu } from '@/components/UserMenu';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
+import { useIncomingCall } from '@/hooks/useIncomingCall';
 
 const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { incomingCall, acceptCall, declineCall } = useIncomingCall();
   const [activeTab, setActiveTab] = useState<'chats' | 'contacts'>('chats');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -23,7 +25,6 @@ const Index = () => {
   const [callData, setCallData] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showChatWindow, setShowChatWindow] = useState(false);
-  const [incomingCall, setIncomingCall] = useState<any>(null);
 
   // Check if user is authenticated
   useEffect(() => {
@@ -82,6 +83,24 @@ const Index = () => {
     setCallData(null);
   };
 
+  const handleAcceptIncomingCall = () => {
+    const callInfo = acceptCall();
+    if (callInfo) {
+      setCallData({
+        contact: {
+          ...callInfo.callerInfo,
+          callType: callInfo.offer.callType,
+        },
+        chatId: callInfo.chatId,
+      });
+      setIsInCall(true);
+    }
+  };
+
+  const handleDeclineIncomingCall = () => {
+    declineCall();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -106,6 +125,15 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      {/* Incoming Call Notification */}
+      {incomingCall && (
+        <IncomingCallNotification
+          caller={incomingCall.callerInfo}
+          callType={incomingCall.offer.callType}
+          onAccept={handleAcceptIncomingCall}
+          onDecline={handleDeclineIncomingCall}
+        />
+      )}
       {/* Mobile Layout */}
       {isMobile ? (
         <div className="h-screen flex flex-col">

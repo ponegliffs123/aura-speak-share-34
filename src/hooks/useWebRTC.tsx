@@ -48,7 +48,7 @@ export const useWebRTC = () => {
     setIsConnecting(false);
   }, [localStream]);
 
-  const initializeWebRTC = useCallback(() => {
+  const initializeWebRTC = useCallback(async () => {
     if (!user?.id || webrtcConnection.current) return;
 
     webrtcConnection.current = new WebRTCConnection(rtcConfig, user.id);
@@ -108,7 +108,7 @@ export const useWebRTC = () => {
 
             // Initialize WebRTC if not already done
             if (!webrtcConnection.current) {
-              initializeWebRTC();
+              await initializeWebRTC();
             }
 
             // Add tracks to peer connection
@@ -177,11 +177,11 @@ export const useWebRTC = () => {
       console.log('Got local stream');
 
       // Initialize connections with proper sequencing
-      initializeWebRTC();
+      await initializeWebRTC();
       setupRealtimeChannel(chatId);
       
-      // Wait for initialization
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait a moment for realtime channel to initialize
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       if (!webrtcConnection.current || !realtimeChannel.current) {
         throw new Error('Failed to initialize connections');
