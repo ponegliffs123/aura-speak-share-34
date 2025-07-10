@@ -49,46 +49,65 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
         console.log('Summary not found, trying direct chat query');
 
-        // Fallback: try to get chat info directly with participants
+        // Fallback: get chat info and then separately get participant profiles
         const { data: chatData, error: chatError } = await supabase
           .from('chats')
-          .select(`
-            *,
-            chat_participants!inner(
-              user_id,
-              profiles!chat_participants_user_id_fkey(id, username, full_name)
-            )
-          `)
+          .select('*')
           .eq('id', chatId)
           .single();
         
-        if (!chatError && chatData) {
-          console.log('Chat info from direct query:', chatData);
-          
-          // For DM chats, find the other participant
-          const otherParticipant = chatData.chat_participants.find(
-            (p: any) => p.user_id !== user.id
-          );
-          
-          const displayName = chatData.is_group 
-            ? chatData.name || 'Group Chat'
-            : otherParticipant?.profiles?.full_name || 
-              otherParticipant?.profiles?.username || 
-              'Unknown User';
-
-          setChatInfo({
-            ...chatData,
-            display_name: displayName
-          });
-        } else {
-          console.error('Error fetching chat info:', chatError);
-          // Set minimal chat info to prevent crashes
+        if (chatError) {
+          console.error('Error fetching chat:', chatError);
           setChatInfo({
             id: chatId,
             display_name: 'Chat',
             is_group: false
           });
+          setChatInfoLoading(false);
+          return;
         }
+
+        // Get chat participants
+        const { data: participantsData, error: participantsError } = await supabase
+          .from('chat_participants')
+          .select(`
+            user_id,
+            profiles(id, username, full_name)
+          `)
+          .eq('chat_id', chatId);
+
+        if (participantsError) {
+          console.error('Error fetching participants:', participantsError);
+          setChatInfo({
+            ...chatData,
+            display_name: chatData.name || 'Chat'
+          });
+          setChatInfoLoading(false);
+          return;
+        }
+
+        console.log('Chat participants:', participantsData);
+        
+        // For DM chats, find the other participant
+        let displayName = chatData.name || 'Chat';
+        
+        if (!chatData.is_group && participantsData) {
+          const otherParticipant = participantsData.find(
+            (p: any) => p.user_id !== user.id
+          );
+          
+          if (otherParticipant?.profiles) {
+            displayName = otherParticipant.profiles.full_name || 
+                        otherParticipant.profiles.username || 
+                        'Unknown User';
+          }
+        }
+
+        setChatInfo({
+          ...chatData,
+          display_name: displayName
+        });
+        
       } catch (error) {
         console.error('Unexpected error fetching chat info:', error);
         // Set minimal chat info to prevent crashes
