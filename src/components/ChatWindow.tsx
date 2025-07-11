@@ -7,6 +7,7 @@ import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 import MediaPicker from './MediaPicker';
 import MediaPreview from './MediaPreview';
+import VoiceRecorder from './VoiceRecorder';
 import EmojiPicker from './EmojiPicker';
 import { useMessages } from '@/hooks/useMessages';
 import { useChats } from '@/hooks/useChats';
@@ -29,6 +30,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const [otherParticipantId, setOtherParticipantId] = useState<string | null>(null);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [showMediaPreview, setShowMediaPreview] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMenuOptions, setShowMenuOptions] = useState(false);
@@ -214,6 +216,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
   const handleMediaSelect = async (media: any) => {
     console.log('Media selected for preview:', media);
+    
+    // Check if this is a voice recording request
+    if (media.type === 'audio' && media.startRecording) {
+      setShowMediaPicker(false);
+      setShowVoiceRecorder(true);
+      return;
+    }
+    
     setSelectedMedia(media);
     setShowMediaPicker(false);
     setShowMediaPreview(true);
@@ -311,6 +321,45 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     setShowMediaPreview(false);
     setSelectedMedia(null);
     setShowMediaPicker(true);
+  };
+
+  const handleVoiceSend = async (audioData: { url: string; duration: number; size: number }) => {
+    console.log('Sending voice message:', audioData);
+    
+    if (audioData && chatId && user) {
+      const messageData = {
+        chat_id: chatId,
+        sender_id: user.id,
+        content: `🎵 Voice message (${Math.floor(audioData.duration / 60)}:${(audioData.duration % 60).toString().padStart(2, '0')})`,
+        message_type: 'audio',
+        media_url: audioData.url,
+        file_name: `voice_message_${Date.now()}.webm`,
+        file_size: audioData.size
+      };
+
+      console.log('Sending voice message data:', messageData);
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([messageData])
+        .select();
+
+      if (error) {
+        console.error('Error sending voice message:', error);
+        toast({
+          title: "Error",
+          description: "Failed to send voice message",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Voice message sent successfully:', data);
+        setShowVoiceRecorder(false);
+      }
+    }
+  };
+
+  const handleVoiceCancel = () => {
+    setShowVoiceRecorder(false);
   };
 
   const handleDeleteMessage = async (messageId: string, deleteForEveryone: boolean) => {
@@ -562,6 +611,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
           onSend={handleMediaSend}
           onCancel={handleMediaCancel}
           onRetake={handleMediaRetake}
+        />
+      )}
+
+      {showVoiceRecorder && (
+        <VoiceRecorder
+          onSend={handleVoiceSend}
+          onCancel={handleVoiceCancel}
         />
       )}
     </div>

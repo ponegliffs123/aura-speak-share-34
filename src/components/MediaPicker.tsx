@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Camera, Image, FileText, X } from 'lucide-react';
+import { Camera, Image, FileText, Mic, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface MediaPickerProps {
@@ -25,6 +25,9 @@ const MediaPicker: React.FC<MediaPickerProps> = ({ onClose, onMediaSelect }) => 
       case 'document':
         input.accept = '.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx';
         break;
+      case 'audio':
+        // For audio, we'll handle recording separately
+        return;
     }
     
     input.onchange = (e) => {
@@ -51,6 +54,14 @@ const MediaPicker: React.FC<MediaPickerProps> = ({ onClose, onMediaSelect }) => 
     onClose();
   };
 
+  const handleAudioRecord = () => {
+    onMediaSelect({
+      type: 'audio',
+      startRecording: true
+    });
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end">
       <div className="bg-white/10 backdrop-blur-lg w-full p-6 rounded-t-2xl">
@@ -66,7 +77,7 @@ const MediaPicker: React.FC<MediaPickerProps> = ({ onClose, onMediaSelect }) => 
           </Button>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <Button
             onClick={() => handleMediaType('camera')}
             variant="ghost"
@@ -92,6 +103,15 @@ const MediaPicker: React.FC<MediaPickerProps> = ({ onClose, onMediaSelect }) => 
           >
             <FileText className="h-8 w-8" />
             <span className="text-sm">Document</span>
+          </Button>
+
+          <Button
+            onClick={handleAudioRecord}
+            variant="ghost"
+            className="flex flex-col items-center space-y-2 p-4 h-auto bg-white/5 hover:bg-white/10 text-white rounded-xl"
+          >
+            <Mic className="h-8 w-8" />
+            <span className="text-sm">Voice</span>
           </Button>
         </div>
       </div>
