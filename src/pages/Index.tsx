@@ -13,6 +13,8 @@ import { UserMenu } from '@/components/UserMenu';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 import { useIncomingCall } from '@/hooks/useIncomingCall';
+import NotificationManager from '@/components/NotificationManager';
+import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -125,6 +127,12 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      {/* Notification Manager */}
+      <NotificationManager currentChatId={selectedChatId || undefined} />
+      
+      {/* Push Notification Prompt */}
+      <PushNotificationPrompt />
+      
       {/* Incoming Call Notification */}
       {incomingCall && (
         <IncomingCallNotification

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Download, Play, MoreVertical, Trash2, RotateCcw } from 'lucide-react';
+import { Download, Play, MoreVertical, Trash2, RotateCcw, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import MessageStatusIndicator from './MessageStatusIndicator';
+import FileViewer from './FileViewer';
 
 interface Message {
   id: string;
@@ -30,6 +31,7 @@ interface MessageBubbleProps {
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage }) => {
   const isFromMe = message.sent;
   const [showMenu, setShowMenu] = useState(false);
+  const [showFileViewer, setShowFileViewer] = useState(false);
   
   const bubbleClasses = `
     max-w-xs p-3 rounded-2xl relative
@@ -44,11 +46,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage 
       case 'image':
         return (
           <div className="space-y-2">
-            <img
-              src={message.mediaUrl}
-              alt="Shared image"
-              className="w-full h-48 object-cover rounded-lg"
-            />
+            <div className="relative group">
+              <img
+                src={message.mediaUrl}
+                alt="Shared image"
+                className="w-full h-48 object-cover rounded-lg cursor-pointer"
+                onClick={() => setShowFileViewer(true)}
+              />
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowFileViewer(true)}
+                  className="text-white hover:bg-white/20"
+                >
+                  <Eye className="h-6 w-6" />
+                </Button>
+              </div>
+            </div>
             {message.text && <p className="text-sm">{message.text}</p>}
           </div>
         );
@@ -56,19 +71,31 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage 
       case 'video':
         return (
           <div className="space-y-2">
-            <div className="relative w-full h-48 bg-black/50 rounded-lg flex items-center justify-center">
+            <div className="relative w-full h-48 bg-black/50 rounded-lg flex items-center justify-center group cursor-pointer"
+                 onClick={() => setShowFileViewer(true)}>
               <video
                 src={message.mediaUrl}
                 className="w-full h-full object-cover rounded-lg"
                 poster={message.mediaUrl}
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute text-white hover:bg-white/20"
-              >
-                <Play className="h-8 w-8" />
-              </Button>
+              <div className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-lg">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/20"
+                >
+                  <Play className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/20"
+                >
+                  <Eye className="h-6 w-6" />
+                </Button>
+              </div>
             </div>
             {message.text && <p className="text-sm">{message.text}</p>}
           </div>
@@ -93,7 +120,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage 
       
       case 'file':
         return (
-          <div className="flex items-center space-x-3 p-2">
+          <div className="flex items-center space-x-3 p-2 cursor-pointer hover:bg-white/10 rounded-lg transition-colors"
+               onClick={() => setShowFileViewer(true)}>
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
               <Download className="h-5 w-5 text-white" />
             </div>
@@ -101,6 +129,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage 
               <p className="text-sm font-medium">{message.fileName}</p>
               <p className="text-xs text-white/60">{message.fileSize}</p>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
           </div>
         );
       
@@ -123,8 +158,21 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage 
     setShowMenu(false);
   };
 
+  const getFileForViewer = () => {
+    if (!message.mediaUrl && !message.fileName) return null;
+    
+    return {
+      id: message.id,
+      type: message.type as 'image' | 'video' | 'audio' | 'document',
+      url: message.mediaUrl || '',
+      name: message.fileName || `${message.type}_${message.id}`,
+      size: message.fileSize,
+    };
+  };
+
   return (
-    <div className={`flex ${isFromMe ? 'justify-end' : 'justify-start'} group`}>
+    <>
+      <div className={`flex ${isFromMe ? 'justify-end' : 'justify-start'} group`}>
       <div className={`${bubbleClasses} relative`}>
         {renderContent()}
         <div className={`flex items-center justify-between mt-1`}>
@@ -169,6 +217,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage 
         </div>
       </div>
     </div>
+
+    <FileViewer
+      isOpen={showFileViewer}
+      onClose={() => setShowFileViewer(false)}
+      file={getFileForViewer()}
+    />
+  </>
   );
 };
 
