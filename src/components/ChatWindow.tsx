@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 import MediaPicker from './MediaPicker';
+import MediaPreview from './MediaPreview';
 import EmojiPicker from './EmojiPicker';
 import { useMessages } from '@/hooks/useMessages';
 import { useChats } from '@/hooks/useChats';
@@ -27,6 +28,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const [chatInfoLoading, setChatInfoLoading] = useState(true);
   const [otherParticipantId, setOtherParticipantId] = useState<string | null>(null);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [showMediaPreview, setShowMediaPreview] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<any>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMenuOptions, setShowMenuOptions] = useState(false);
   const [typingUserNames, setTypingUserNames] = useState<string[]>([]);
@@ -210,14 +213,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   };
 
   const handleMediaSelect = async (media: any) => {
-    console.log('Media selected:', media);
+    console.log('Media selected for preview:', media);
+    setSelectedMedia(media);
+    setShowMediaPicker(false);
+    setShowMediaPreview(true);
+  };
+
+  const handleMediaSend = async (media: any, caption: string) => {
+    console.log('Sending media with caption:', { media, caption });
     console.log('Media URL:', media.url);
     console.log('Media file:', media.file);
     
     if (media && chatId && user) {
       // Determine message type based on file type
       let messageType = 'file';
-      let messageContent = '';
+      let messageContent = caption || '';
       
       if (media.file) {
         const fileType = media.file.type;
@@ -225,16 +235,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         
         if (fileType.startsWith('image/')) {
           messageType = 'image';
-          messageContent = media.name ? `📷 ${media.name}` : '📷 Image';
+          if (!caption) {
+            messageContent = media.name ? `📷 ${media.name}` : '📷 Image';
+          }
         } else if (fileType.startsWith('video/')) {
           messageType = 'video';
-          messageContent = media.name ? `🎥 ${media.name}` : '🎥 Video';
+          if (!caption) {
+            messageContent = media.name ? `🎥 ${media.name}` : '🎥 Video';
+          }
         } else if (fileType.startsWith('audio/')) {
           messageType = 'audio';
-          messageContent = media.name ? `🎵 ${media.name}` : '🎵 Audio';
+          if (!caption) {
+            messageContent = media.name ? `🎵 ${media.name}` : '🎵 Audio';
+          }
         } else {
           messageType = 'file';
-          messageContent = media.name ? `📄 ${media.name}` : '📄 Document';
+          if (!caption) {
+            messageContent = media.name ? `📄 ${media.name}` : '📄 Document';
+          }
         }
       }
 
@@ -278,8 +296,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         });
       } else {
         console.log('Message sent successfully:', data);
+        setShowMediaPreview(false);
+        setSelectedMedia(null);
       }
     }
+  };
+
+  const handleMediaCancel = () => {
+    setShowMediaPreview(false);
+    setSelectedMedia(null);
+  };
+
+  const handleMediaRetake = () => {
+    setShowMediaPreview(false);
+    setSelectedMedia(null);
+    setShowMediaPicker(true);
   };
 
   const handleDeleteMessage = async (messageId: string, deleteForEveryone: boolean) => {
@@ -522,6 +553,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         <MediaPicker 
           onClose={() => setShowMediaPicker(false)}
           onMediaSelect={handleMediaSelect}
+        />
+      )}
+
+      {showMediaPreview && (
+        <MediaPreview
+          media={selectedMedia}
+          onSend={handleMediaSend}
+          onCancel={handleMediaCancel}
+          onRetake={handleMediaRetake}
         />
       )}
     </div>
