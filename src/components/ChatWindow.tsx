@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, Send, MoreVertical, Paperclip, Smile, MapPin } from 'lucide-react';
+import { ArrowLeft, Phone, Video, Send, MoreVertical, Paperclip, Smile, MapPin, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MessageBubble from './MessageBubble';
@@ -216,14 +216,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
   const handleMediaSelect = async (media: any) => {
     console.log('Media selected for preview:', media);
-    
-    // Check if this is a voice recording request
-    if (media.type === 'audio' && media.startRecording) {
-      setShowMediaPicker(false);
-      setShowVoiceRecorder(true);
-      return;
-    }
-    
     setSelectedMedia(media);
     setShowMediaPicker(false);
     setShowMediaPreview(true);
@@ -567,6 +559,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
             className="text-white hover:bg-white/10"
           >
             <Paperclip className="h-4 w-4" />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowVoiceRecorder(true)}
+            className="text-white hover:bg-white/10"
+          >
+            <Mic className="h-4 w-4" />
           </Button>
           
           <div className="flex-1">
