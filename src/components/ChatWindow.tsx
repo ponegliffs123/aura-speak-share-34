@@ -12,6 +12,7 @@ import { useChats } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { useMessageReads } from '@/hooks/useMessageReads';
 import { useMessageStatus } from '@/hooks/useMessageStatus';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ChatWindowProps {
@@ -35,6 +36,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const { user } = useAuth();
   const { markMessagesAsRead } = useMessageReads();
   const { sendTypingStatus, typingUsers } = useMessageStatus(chatId);
+  const { toast } = useToast();
 
   // Fetch chat info with better error handling and fallback
   useEffect(() => {
@@ -209,6 +211,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
   const handleMediaSelect = async (media: any) => {
     console.log('Media selected:', media);
+    console.log('Media URL:', media.url);
+    console.log('Media file:', media.file);
+    
     if (media && chatId && user) {
       // Determine message type based on file type
       let messageType = 'file';
@@ -233,6 +238,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         }
       }
 
+      // Ensure we have a valid data URL
+      if (!media.url || !media.url.startsWith('data:')) {
+        console.error('Invalid media URL:', media.url);
+        toast({
+          title: "Error",
+          description: "Failed to process media file",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Create message with media data
       const messageData = {
         chat_id: chatId,
@@ -244,15 +260,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         file_size: media.size
       };
 
-      console.log('Sending message with media:', messageData);
+      console.log('Sending message with media data:', messageData);
+      console.log('Media URL length:', media.url?.length);
 
       // Insert the message into the database
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
-        .insert([messageData]);
+        .insert([messageData])
+        .select();
 
       if (error) {
         console.error('Error sending media message:', error);
+        toast({
+          title: "Error",
+          description: "Failed to send media",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Message sent successfully:', data);
       }
     }
   };

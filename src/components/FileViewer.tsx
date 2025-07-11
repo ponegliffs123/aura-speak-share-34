@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { X, Download, Share, ZoomIn, ZoomOut, RotateCw, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 interface FileViewerProps {
   isOpen: boolean;
@@ -195,6 +196,12 @@ const FileViewer: React.FC<FileViewerProps> = ({ isOpen, onClose, file }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-screen-lg w-full h-screen p-0 bg-black/95 border-none">
+        <VisuallyHidden>
+          <DialogTitle>{file.name}</DialogTitle>
+          <DialogDescription>
+            File viewer for {file.type} - {file.name}
+          </DialogDescription>
+        </VisuallyHidden>
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-10 bg-black/80 backdrop-blur-sm border-b border-white/10 p-4">
           <div className="flex items-center justify-between">
