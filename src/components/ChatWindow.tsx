@@ -209,24 +209,51 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
   const handleMediaSelect = async (media: any) => {
     console.log('Media selected:', media);
-    if (media && chatId) {
-      // For now, send a placeholder message indicating media was shared
-      // In a real app, you'd upload the file first
+    if (media && chatId && user) {
+      // Determine message type based on file type
+      let messageType = 'file';
       let messageContent = '';
       
-      switch (media.type) {
-        case 'camera':
-        case 'gallery':
-          messageContent = `📷 Image: ${media.name}`;
-          break;
-        case 'document':
-          messageContent = `📄 Document: ${media.name}`;
-          break;
-        default:
-          messageContent = `📎 File: ${media.name}`;
+      if (media.file) {
+        const fileType = media.file.type;
+        console.log('File type:', fileType);
+        
+        if (fileType.startsWith('image/')) {
+          messageType = 'image';
+          messageContent = media.name ? `📷 ${media.name}` : '📷 Image';
+        } else if (fileType.startsWith('video/')) {
+          messageType = 'video';
+          messageContent = media.name ? `🎥 ${media.name}` : '🎥 Video';
+        } else if (fileType.startsWith('audio/')) {
+          messageType = 'audio';
+          messageContent = media.name ? `🎵 ${media.name}` : '🎵 Audio';
+        } else {
+          messageType = 'file';
+          messageContent = media.name ? `📄 ${media.name}` : '📄 Document';
+        }
       }
-      
-      await sendMessage(chatId, messageContent);
+
+      // Create message with media data
+      const messageData = {
+        chat_id: chatId,
+        sender_id: user.id,
+        content: messageContent,
+        message_type: messageType,
+        media_url: media.url, // This is the data URL from FileReader
+        file_name: media.name,
+        file_size: media.size
+      };
+
+      console.log('Sending message with media:', messageData);
+
+      // Insert the message into the database
+      const { error } = await supabase
+        .from('messages')
+        .insert([messageData]);
+
+      if (error) {
+        console.error('Error sending media message:', error);
+      }
     }
   };
 
