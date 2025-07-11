@@ -75,7 +75,7 @@ export const useProfile = () => {
     }
   };
 
-  const updateProfile = async (updates: Partial<Profile>) => {
+  const updateProfile = async (updates: Partial<Profile>, customMessage?: string) => {
     if (!user) return;
 
     try {
@@ -87,9 +87,25 @@ export const useProfile = () => {
       if (error) throw error;
 
       setProfile(prev => prev ? { ...prev, ...updates } : null);
+      
+      // Generate specific message based on what was updated
+      let description = customMessage || "Your profile has been updated successfully.";
+      
+      if (!customMessage) {
+        if (updates.avatar_url !== undefined) {
+          description = "Profile picture has been updated successfully.";
+        } else if (updates.theme_preference !== undefined) {
+          description = `Theme changed to ${updates.theme_preference} mode.`;
+        } else if (updates.full_name !== undefined) {
+          description = "Your name has been updated successfully.";
+        } else if (updates.username !== undefined) {
+          description = "Your username has been updated successfully.";
+        }
+      }
+      
       toast({
         title: "Profile updated",
-        description: "Your profile has been updated successfully.",
+        description,
       });
     } catch (error) {
       console.error('Error updating profile:', error);

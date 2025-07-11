@@ -209,7 +209,48 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
 
   const handleMediaSelect = async (media: any) => {
     console.log('Media selected:', media);
-    // TODO: Upload media and send as message
+    if (media && chatId) {
+      // For now, send a placeholder message indicating media was shared
+      // In a real app, you'd upload the file first
+      let messageContent = '';
+      
+      switch (media.type) {
+        case 'camera':
+        case 'gallery':
+          messageContent = `📷 Image: ${media.name}`;
+          break;
+        case 'document':
+          messageContent = `📄 Document: ${media.name}`;
+          break;
+        default:
+          messageContent = `📎 File: ${media.name}`;
+      }
+      
+      await sendMessage(chatId, messageContent);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string, deleteForEveryone: boolean) => {
+    try {
+      if (deleteForEveryone) {
+        // Delete the message from the database
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', messageId);
+          
+        if (error) {
+          console.error('Error deleting message:', error);
+          return;
+        }
+      } else {
+        // For "remove for you", you could mark it as hidden or implement client-side filtering
+        // For now, we'll just show a placeholder behavior
+        console.log('Message removed for user only');
+      }
+    } catch (error) {
+      console.error('Error handling message deletion:', error);
+    }
   };
 
   const handleLocationShare = () => {
@@ -365,7 +406,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
                 mediaUrl: msg.media_url || undefined,
                 fileName: msg.file_name || undefined,
                 fileSize: msg.file_size ? `${Math.round(msg.file_size / 1024)}KB` : undefined
-              }} 
+              }}
+              onDeleteMessage={handleDeleteMessage}
             />
           ))
         )}

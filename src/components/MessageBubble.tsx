@@ -1,7 +1,13 @@
 
-import React from 'react';
-import { Download, Play } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Play, MoreVertical, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import MessageStatusIndicator from './MessageStatusIndicator';
 
 interface Message {
@@ -18,10 +24,12 @@ interface Message {
 
 interface MessageBubbleProps {
   message: Message;
+  onDeleteMessage?: (messageId: string, deleteForEveryone: boolean) => void;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDeleteMessage }) => {
   const isFromMe = message.sent;
+  const [showMenu, setShowMenu] = useState(false);
   
   const bubbleClasses = `
     max-w-xs p-3 rounded-2xl relative
@@ -101,18 +109,63 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     }
   };
 
+  const handleDeleteForEveryone = () => {
+    if (onDeleteMessage) {
+      onDeleteMessage(message.id, true);
+    }
+    setShowMenu(false);
+  };
+
+  const handleDeleteForMe = () => {
+    if (onDeleteMessage) {
+      onDeleteMessage(message.id, false);
+    }
+    setShowMenu(false);
+  };
+
   return (
-    <div className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
-      <div className={bubbleClasses}>
+    <div className={`flex ${isFromMe ? 'justify-end' : 'justify-start'} group`}>
+      <div className={`${bubbleClasses} relative`}>
         {renderContent()}
         <div className={`flex items-center justify-between mt-1`}>
           <div className={`text-xs ${isFromMe ? 'text-white/70' : 'text-white/50'}`}>
             {message.timestamp}
           </div>
-          <MessageStatusIndicator 
-            status={message.status || 'delivered'} 
-            isOwnMessage={isFromMe} 
-          />
+          <div className="flex items-center space-x-1">
+            <MessageStatusIndicator 
+              status={message.status || 'delivered'} 
+              isOwnMessage={isFromMe} 
+            />
+            {isFromMe && (
+              <DropdownMenu open={showMenu} onOpenChange={setShowMenu}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-white/70 hover:bg-white/10"
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-black/90 backdrop-blur-lg border-white/10">
+                  <DropdownMenuItem 
+                    onClick={handleDeleteForEveryone}
+                    className="text-red-400 hover:bg-red-900/20 cursor-pointer"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete for everyone</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleDeleteForMe}
+                    className="text-yellow-400 hover:bg-yellow-900/20 cursor-pointer"
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    <span>Remove for you</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </div>
     </div>
