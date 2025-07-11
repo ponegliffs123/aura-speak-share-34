@@ -17,6 +17,7 @@ const AppLayout = () => {
   const [isInCall, setIsInCall] = useState(false);
   const [callContact, setCallContact] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchBar, setShowSearchBar] = useState(true);
 
   const handleStartCall = (contact: any, type: 'voice' | 'video') => {
     setCallContact({ ...contact, callType: type });
@@ -50,6 +51,7 @@ const AppLayout = () => {
             <Button
               variant="ghost"
               size="icon"
+              onClick={() => setShowSearchBar(!showSearchBar)}
               className="text-white hover:bg-white/10"
             >
               <Search className="h-5 w-5" />
@@ -57,6 +59,15 @@ const AppLayout = () => {
             <Button
               variant="ghost"
               size="icon"
+              onClick={() => {
+                if (activeTab === 'chats') {
+                  // Trigger new conversation
+                  (document.querySelector('[data-new-conversation]') as HTMLButtonElement)?.click();
+                } else if (activeTab === 'contacts') {
+                  // Trigger add contact
+                  (document.querySelector('[data-add-contact]') as HTMLButtonElement)?.click();
+                }
+              }}
               className="text-white hover:bg-white/10"
             >
               <Plus className="h-5 w-5" />
@@ -68,14 +79,16 @@ const AppLayout = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="px-4 py-3 max-w-md mx-auto">
-        <Input
-          placeholder="Search chats, contacts..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-purple-400"
-        />
-      </div>
+      {showSearchBar && (
+        <div className="px-4 py-3 max-w-md mx-auto">
+          <Input
+            placeholder="Search chats, contacts..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-white/10 border-white/20 text-white placeholder-white/50 focus:border-purple-400"
+          />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 max-w-md mx-auto">

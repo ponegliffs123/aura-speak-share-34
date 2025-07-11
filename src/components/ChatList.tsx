@@ -50,6 +50,7 @@ const ChatList: React.FC<ChatListProps> = ({ onSelectChat, searchQuery, selected
         <div className="mb-4">
           <Button
             onClick={() => setShowUserSearch(true)}
+            data-new-conversation
             className="w-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center space-x-2"
           >
             <Plus className="h-4 w-4" />

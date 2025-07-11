@@ -10,20 +10,44 @@ interface MediaPickerProps {
 
 const MediaPicker: React.FC<MediaPickerProps> = ({ onClose, onMediaSelect }) => {
   const handleMediaType = (type: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.style.display = 'none';
+    
     switch (type) {
       case 'camera':
-        // Open camera
-        console.log('Opening camera...');
+        input.accept = 'image/*,video/*';
+        input.capture = 'environment';
         break;
       case 'gallery':
-        // Open gallery
-        console.log('Opening gallery...');
+        input.accept = 'image/*,video/*';
         break;
       case 'document':
-        // Open document picker
-        console.log('Opening document picker...');
+        input.accept = '.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx';
         break;
     }
+    
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files && files[0]) {
+        const file = files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          onMediaSelect({
+            type,
+            file,
+            name: file.name,
+            size: file.size,
+            url: e.target?.result
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
     onClose();
   };
 

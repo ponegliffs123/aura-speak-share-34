@@ -130,6 +130,7 @@ const ContactList: React.FC<ContactListProps> = ({ onStartCall, searchQuery }) =
             variant="ghost"
             size="icon"
             onClick={() => setShowUserSearch(true)}
+            data-add-contact
             className="text-white hover:bg-white/10"
           >
             <UserPlus className="h-5 w-5" />

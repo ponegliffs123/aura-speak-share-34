@@ -1,10 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, Send, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Phone, Video, Send, MoreVertical, Paperclip, Smile, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
+import MediaPicker from './MediaPicker';
+import EmojiPicker from './EmojiPicker';
 import { useMessages } from '@/hooks/useMessages';
 import { useChats } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +25,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
   const [chatInfo, setChatInfo] = useState<any>(null);
   const [chatInfoLoading, setChatInfoLoading] = useState(true);
   const [otherParticipantId, setOtherParticipantId] = useState<string | null>(null);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMenuOptions, setShowMenuOptions] = useState(false);
+  const [typingUserNames, setTypingUserNames] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { messages, loading: messagesLoading } = useMessages(chatId);
   const { sendMessage } = useChats();
@@ -143,6 +149,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     }
   }, [chatId, messages.length, markMessagesAsRead]);
 
+  // Get actual user names for typing indicator
+  useEffect(() => {
+    const fetchTypingUserNames = async () => {
+      if (typingUsers.length === 0) {
+        setTypingUserNames([]);
+        return;
+      }
+
+      try {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, full_name')
+          .in('id', typingUsers);
+
+        const names = profiles?.map(profile => 
+          profile.full_name || profile.username || 'Someone'
+        ) || ['Someone'];
+        
+        setTypingUserNames(names);
+      } catch (error) {
+        console.error('Error fetching typing user names:', error);
+        setTypingUserNames(['Someone']);
+      }
+    };
+
+    fetchTypingUserNames();
+  }, [typingUsers]);
+
   const handleSendMessage = async () => {
     if (message.trim() && user && chatId) {
       console.log('Sending message:', message.trim());
@@ -167,6 +201,37 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
     } else {
       sendTypingStatus(false);
     }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+  };
+
+  const handleMediaSelect = async (media: any) => {
+    console.log('Media selected:', media);
+    // TODO: Upload media and send as message
+  };
+
+  const handleLocationShare = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const locationMessage = `📍 Location: https://maps.google.com/?q=${latitude},${longitude}`;
+          sendMessage(chatId, locationMessage);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Could not get your location. Please check your permissions.');
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by this browser.');
+    }
+  };
+
+  const toggleMenuOptions = () => {
+    setShowMenuOptions(!showMenuOptions);
   };
 
   const getInitials = (name: string | null) => {
@@ -244,13 +309,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
             >
               <Video className="h-5 w-5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-            >
-              <MoreVertical className="h-5 w-5" />
-            </Button>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMenuOptions}
+                className="text-white hover:bg-white/10"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+              
+              {showMenuOptions && (
+                <div className="absolute right-0 top-12 bg-black/90 backdrop-blur-lg border border-white/10 rounded-lg p-2 z-50 min-w-[150px]">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-white hover:bg-white/10"
+                    onClick={handleLocationShare}
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Share Location
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -290,14 +371,30 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
         )}
         <TypingIndicator 
           isVisible={typingUsers.length > 0} 
-          userNames={['Someone']} // You can enhance this to show actual names
+          userNames={typingUserNames}
         />
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
-      <div className="bg-black/20 backdrop-blur-lg border-t border-white/10 p-4 flex-shrink-0">
+      <div className="bg-black/20 backdrop-blur-lg border-t border-white/10 p-4 flex-shrink-0 relative">
+        {showEmojiPicker && (
+          <EmojiPicker 
+            onEmojiSelect={handleEmojiSelect}
+            onClose={() => setShowEmojiPicker(false)}
+          />
+        )}
+        
         <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowMediaPicker(true)}
+            className="text-white hover:bg-white/10"
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          
           <div className="flex-1">
             <Input
               value={message}
@@ -309,6 +406,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
           </div>
           
           <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="text-white hover:bg-white/10"
+          >
+            <Smile className="h-4 w-4" />
+          </Button>
+          
+          <Button
             onClick={handleSendMessage}
             disabled={!message.trim()}
             className="bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
@@ -317,6 +423,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ chatId, onBack, onStartCall }) 
           </Button>
         </div>
       </div>
+      
+      {showMediaPicker && (
+        <MediaPicker 
+          onClose={() => setShowMediaPicker(false)}
+          onMediaSelect={handleMediaSelect}
+        />
+      )}
     </div>
   );
 };
