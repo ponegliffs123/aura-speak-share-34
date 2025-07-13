@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useVideoSDK } from '@/hooks/useVideoSDK';
-import { VideoSDKProvider } from '@/components/VideoSDKProvider';
+import { useJitsiMeet } from '@/hooks/useJitsiMeet';
 import { useAuth } from '@/hooks/useAuth';
 
 interface CallInterfaceProps {
@@ -16,9 +15,7 @@ interface CallInterfaceProps {
   onEndCall: () => void;
 }
 
-const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, onEndCall }) => {
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(contact.callType === 'video');
+const CallInterface: React.FC<CallInterfaceProps> = ({ contact, chatId, onEndCall }) => {
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const { user } = useAuth();
@@ -32,8 +29,10 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
     isConnecting,
     meetingId,
     participants,
-    token,
-  } = useVideoSDK();
+    isMuted,
+    isVideoOn,
+    containerRef,
+  } = useJitsiMeet();
 
   // Start call when component mounts
   useEffect(() => {
@@ -55,12 +54,10 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
 
   const handleMute = () => {
     toggleMute();
-    setIsMuted(!isMuted);
   };
 
   const handleVideo = () => {
     toggleVideo();
-    setIsVideoEnabled(!isVideoEnabled);
   };
 
   const handleEndCall = () => {
@@ -74,96 +71,69 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Get remote participants (excluding local user)
-  const remoteParticipants = participants.filter(p => p.id !== user?.id);
-  const hasRemoteParticipant = remoteParticipants.length > 0;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white relative overflow-hidden">
       {/* Background Effect */}
       <div className="absolute inset-0 bg-black/30"></div>
       
-      {/* Video Background (if video call) */}
-      {contact.callType === 'video' && (
-        <div className="absolute inset-0">
-          {/* Remote video placeholder */}
-          {hasRemoteParticipant ? (
-            <div className="w-full h-full bg-gradient-to-br from-purple-800 to-blue-800 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold mb-4">
-                  {contact.avatar || contact.name[0]}
-                </div>
-                <p className="text-white/70">Video connected via VideoSDK</p>
-              </div>
+      {/* Jitsi Meet Container */}
+      {isConnected && (
+        <div 
+          ref={containerRef}
+          className="absolute inset-0 w-full h-full"
+        />
+      )}
+      
+      {/* Call Info Overlay (when not connected) */}
+      {!isConnected && (
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8">
+          <div className="text-center mb-8">
+            <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold mb-6 mx-auto">
+              {contact.avatar || contact.name[0]}
             </div>
-          ) : (
-            <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-purple-800 to-blue-800 flex items-center justify-center">
-              <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold">
-                {contact.avatar || contact.name[0]}
+            
+            <h2 className="text-2xl font-bold mb-2">{contact.name}</h2>
+            <p className="text-lg text-white/70">
+              {isConnecting ? 'Connecting...' : 'Initiating call...'}
+            </p>
+            <p className="text-sm text-white/50 mt-1">
+              {contact.callType === 'video' ? 'Video Call' : 'Voice Call'} • Jitsi Meet
+            </p>
+          </div>
+
+          {/* Connection Status Animation */}
+          {isConnecting && (
+            <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
+              <div className="flex items-center space-x-2">
+                <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>
+                <div className="animate-pulse w-2 h-2 bg-white rounded-full" style={{ animationDelay: '0.2s' }}></div>
+                <div className="animate-pulse w-2 h-2 bg-white rounded-full" style={{ animationDelay: '0.4s' }}></div>
               </div>
             </div>
           )}
-          
-          {/* Local Video (small window) */}
-          <div className="absolute top-4 right-4 w-24 h-32 bg-black/50 rounded-lg overflow-hidden flex items-center justify-center">
-            <div className="text-xs text-white/70 text-center">
-              Your video
-            </div>
-          </div>
         </div>
       )}
 
       {/* Connection Status */}
       {isConnecting && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-500/20 backdrop-blur-lg border border-blue-500/30 rounded-lg p-3">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-500/20 backdrop-blur-lg border border-blue-500/30 rounded-lg p-3 z-50">
           <p className="text-sm text-white">
-            Connecting to VideoSDK...
+            Connecting to Jitsi Meet...
           </p>
         </div>
       )}
 
       {isConnected && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-500/20 backdrop-blur-lg border border-green-500/30 rounded-lg p-3">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-500/20 backdrop-blur-lg border border-green-500/30 rounded-lg p-3 z-50">
           <p className="text-sm text-white">
-            Connected • Meeting ID: {meetingId}
+            Connected • {formatDuration(callDuration)}
           </p>
         </div>
       )}
 
-      {/* Debug info */}
-      <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-lg rounded-lg p-2 text-xs">
-        <p>Token: {token ? 'Available' : 'Loading...'}</p>
-        <p>Meeting ID: {meetingId || 'Not set'}</p>
-        <p>Participants: {participants.length}</p>
-        <p>Connecting: {isConnecting ? 'Yes' : 'No'}</p>
-        <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
-      </div>
-
-      {/* Call Info */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8">
-        <div className="text-center mb-8">
-          {contact.callType === 'voice' && (
-            <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold mb-6 mx-auto">
-              {contact.avatar || contact.name[0]}
-            </div>
-          )}
-          
-          <h2 className="text-2xl font-bold mb-2">{contact.name}</h2>
-          <p className="text-lg text-white/70">
-            {isConnecting ? 'Connecting...' : isConnected ? formatDuration(callDuration) : 'Initiating call...'}
-          </p>
-          <p className="text-sm text-white/50 mt-1">
-            {contact.callType === 'video' ? 'Video Call' : 'Voice Call'} • VideoSDK
-          </p>
-          {participants.length > 0 && (
-            <p className="text-xs text-white/40 mt-2">
-              {participants.length} participant{participants.length !== 1 ? 's' : ''} in call
-            </p>
-          )}
-        </div>
-
-        {/* Call Controls */}
-        <div className="flex items-center justify-center space-x-6 mt-auto">
+      {/* Call Controls Overlay */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="flex items-center justify-center space-x-6">
           {/* Mute */}
           <Button
             onClick={handleMute}
@@ -201,58 +171,39 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
           >
             <Volume2 className="h-6 w-6 text-white" />
           </Button>
-        </div>
 
-        {/* Video Controls (if video call) */}
-        {contact.callType === 'video' && (
-          <div className="flex items-center justify-center space-x-4 mt-6">
+          {/* Video Controls (if video call) */}
+          {contact.callType === 'video' && (
             <Button
               onClick={handleVideo}
               variant="ghost"
               size="icon"
-              className={`w-12 h-12 rounded-full ${
-                !isVideoEnabled ? 'bg-red-500 hover:bg-red-600' : 'bg-white/20 hover:bg-white/30'
+              className={`w-14 h-14 rounded-full ${
+                !isVideoOn ? 'bg-red-500 hover:bg-red-600' : 'bg-white/20 hover:bg-white/30'
               }`}
             >
-              {isVideoEnabled ? (
-                <Video className="h-5 w-5 text-white" />
+              {isVideoOn ? (
+                <Video className="h-6 w-6 text-white" />
               ) : (
-                <VideoOff className="h-5 w-5 text-white" />
+                <VideoOff className="h-6 w-6 text-white" />
               )}
             </Button>
-          </div>
-        )}
-
-        {/* Connection Status Animation */}
-        {isConnecting && (
-          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2">
-            <div className="flex items-center space-x-2">
-              <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>
-              <div className="animate-pulse w-2 h-2 bg-white rounded-full" style={{ animationDelay: '0.2s' }}></div>
-              <div className="animate-pulse w-2 h-2 bg-white rounded-full" style={{ animationDelay: '0.4s' }}></div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Debug info (only in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-lg rounded-lg p-2 text-xs z-50">
+          <p>Meeting ID: {meetingId || 'Not set'}</p>
+          <p>Participants: {participants.length}</p>
+          <p>Connecting: {isConnecting ? 'Yes' : 'No'}</p>
+          <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
+          <p>Muted: {isMuted ? 'Yes' : 'No'}</p>
+          <p>Video: {isVideoOn ? 'On' : 'Off'}</p>
+        </div>
+      )}
     </div>
-  );
-};
-
-const CallInterface: React.FC<CallInterfaceProps> = (props) => {
-  const [meetingConfig, setMeetingConfig] = useState<{
-    token?: string;
-    meetingId?: string;
-  }>({});
-
-  return (
-    <VideoSDKProvider
-      participantId={props.contact.id}
-      displayName={props.contact.name}
-      token={meetingConfig.token}
-      meetingId={meetingConfig.meetingId}
-    >
-      <CallInterfaceContent {...props} />
-    </VideoSDKProvider>
   );
 };
 
