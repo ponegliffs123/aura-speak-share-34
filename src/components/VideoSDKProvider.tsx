@@ -6,16 +6,15 @@ interface VideoSDKProviderProps {
   meetingId?: string;
   participantId?: string;
   displayName?: string;
+  token?: string;
 }
-
-// VideoSDK configuration
-const VIDEOSDK_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlrZXkiOiI2ZmY0YWM4OS1mNjlmLTQ4ZTMtYjc4Zi1kNzlmNmY2ZjZmNmYiLCJwZXJtaXNzaW9ucyI6WyJhbGxvd19qb2luIl0sImlhdCI6MTY5MDM2MDA2MCwiZXhwIjoxNjkwNDQ2NDYwfQ.example"; // This should come from your backend
 
 export const VideoSDKProvider: React.FC<VideoSDKProviderProps> = ({
   children,
   meetingId,
   participantId,
   displayName = 'User',
+  token,
 }) => {
   const config = {
     meetingId: meetingId || '',
@@ -26,10 +25,14 @@ export const VideoSDKProvider: React.FC<VideoSDKProviderProps> = ({
     debugMode: false,
   };
 
+  if (!token) {
+    return <div>Loading VideoSDK...</div>;
+  }
+
   return (
     <MeetingProvider
       config={config}
-      token={VIDEOSDK_TOKEN}
+      token={token}
     >
       {children}
     </MeetingProvider>

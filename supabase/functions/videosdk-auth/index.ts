@@ -12,12 +12,35 @@ serve(async (req) => {
 
   try {
     const { userId } = await req.json();
+    const apiKey = Deno.env.get('VIDEOSDK_API_KEY');
+    
+    if (!apiKey) {
+      throw new Error('VideoSDK API key not configured');
+    }
 
     // Generate VideoSDK token
-    const response = await fetch('https://api.videosdk.live/v2/rooms', {
+    const tokenResponse = await fetch('https://api.videosdk.live/v2/generate', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('VIDEOSDK_API_KEY')}`,
+        'Authorization': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        permissions: ['allow_join', 'allow_mod'],
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to generate VideoSDK token');
+    }
+
+    const tokenData = await tokenResponse.json();
+
+    // Create a meeting room
+    const roomResponse = await fetch('https://api.videosdk.live/v2/rooms', {
+      method: 'POST',
+      headers: {
+        'Authorization': tokenData.token,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -25,14 +48,17 @@ serve(async (req) => {
       }),
     });
 
-    if (!response.ok) {
+    if (!roomResponse.ok) {
       throw new Error('Failed to create VideoSDK room');
     }
 
-    const data = await response.json();
+    const roomData = await roomResponse.json();
 
     return new Response(
-      JSON.stringify({ meetingId: data.roomId }),
+      JSON.stringify({ 
+        token: tokenData.token,
+        meetingId: roomData.roomId 
+      }),
       { 
         headers: { 
           ...corsHeaders, 

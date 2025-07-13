@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useMeeting, usePubSub } from '@videosdk.live/react-sdk';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useVideoSDK = () => {
   const { user } = useAuth();
@@ -55,22 +56,15 @@ export const useVideoSDK = () => {
   // Create a new meeting
   const createMeeting = useCallback(async () => {
     try {
-      const response = await fetch('/api/videosdk/create-meeting', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user?.id,
-        }),
+      const { data, error } = await supabase.functions.invoke('videosdk-auth', {
+        body: { userId: user?.id }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create meeting');
+      if (error) {
+        throw error;
       }
 
-      const data = await response.json();
-      return data.meetingId;
+      return { token: data.token, meetingId: data.meetingId };
     } catch (error) {
       console.error('Error creating meeting:', error);
       throw error;
@@ -83,8 +77,8 @@ export const useVideoSDK = () => {
       setIsConnecting(true);
 
       // Create a new meeting
-      const newMeetingId = await createMeeting();
-      setMeetingId(newMeetingId);
+      const meetingData = await createMeeting();
+      setMeetingId(meetingData.meetingId);
 
       // Send meeting invitation through Supabase realtime
       // This will be handled by the existing realtime infrastructure
@@ -92,7 +86,7 @@ export const useVideoSDK = () => {
       // Join the meeting
       join();
 
-      console.log('VideoSDK call initiated with meeting ID:', newMeetingId);
+      console.log('VideoSDK call initiated with meeting ID:', meetingData.meetingId);
 
     } catch (error) {
       console.error('VideoSDK call failed:', error);
