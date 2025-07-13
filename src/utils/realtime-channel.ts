@@ -17,7 +17,11 @@ export class RealtimeChannel {
     if (this.channel) return;
 
     console.log('Setting up realtime channel for chat:', this.chatId);
-    this.channel = supabase.channel(`call-${this.chatId}`)
+    this.channel = supabase.channel(`call-${this.chatId}`, {
+      config: {
+        broadcast: { self: true }
+      }
+    })
       .on('broadcast', { event: 'call-offer' }, (payload) => {
         const offer: CallOffer = payload.payload;
         console.log('Received call offer:', offer);
@@ -38,7 +42,9 @@ export class RealtimeChannel {
           this.onCallEndCallback();
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime channel status:', status);
+      });
   }
 
   sendCallOffer(offer: CallOffer) {

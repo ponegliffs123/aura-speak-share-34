@@ -11,7 +11,9 @@ export class WebRTCConnection {
   constructor(
     private config: WebRTCConfig,
     private userId: string
-  ) {}
+  ) {
+    console.log('WebRTCConnection constructor called with:', { userId, config });
+  }
 
   initialize() {
     if (this.peerConnection) return;
