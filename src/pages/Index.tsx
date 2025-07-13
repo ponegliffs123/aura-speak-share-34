@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import ChatList from '@/components/ChatList';
 import ChatWindow from '@/components/ChatWindow';
 import ContactList from '@/components/ContactList';
-import CallInterface from '@/components/CallInterface';
+import CallInterface from '@/components/CallInterfaceNew';
 import IncomingCallNotification from '@/components/IncomingCallNotification';
 import { UserMenu } from '@/components/UserMenu';
 import { ThemeToggle } from '@/components/ThemeToggle';

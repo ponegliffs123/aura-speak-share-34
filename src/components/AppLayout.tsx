@@ -8,7 +8,7 @@ import { UserMenu } from '@/components/UserMenu';
 import ChatList from './ChatList';
 import ChatWindow from './ChatWindow';
 import ContactList from './ContactList';
-import CallInterface from './CallInterface';
+import CallInterface from './CallInterfaceNew';
 import MediaGallery from './MediaGallery';
 
 const AppLayout = () => {

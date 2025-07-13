@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useVideoSDK } from '@/hooks/useVideoSDK';
-import { VideoSDKProvider } from '@/components/VideoSDKProvider';
+import { useVideoSDKMeeting } from '@/hooks/useVideoSDKMeeting';
 import { useAuth } from '@/hooks/useAuth';
 
 interface CallInterfaceProps {
@@ -16,9 +15,7 @@ interface CallInterfaceProps {
   onEndCall: () => void;
 }
 
-const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, onEndCall }) => {
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(contact.callType === 'video');
+const CallInterface: React.FC<CallInterfaceProps> = ({ contact, chatId, onEndCall }) => {
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const { user } = useAuth();
@@ -33,11 +30,33 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
     meetingId,
     participants,
     token,
-  } = useVideoSDK();
+    isMicOn,
+    isWebcamOn,
+  } = useVideoSDKMeeting();
+
+  // Load VideoSDK script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://sdk.videosdk.live/js-sdk/0.1.6/videosdk.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('VideoSDK script loaded');
+    };
+    script.onerror = () => {
+      console.error('Failed to load VideoSDK script');
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
+  }, []);
 
   // Start call when component mounts
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && window.VideoSDK) {
       console.log('CallInterface: Starting call for user:', user.id);
       startCall(contact.id, chatId, contact.callType);
     }
@@ -52,16 +71,6 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
       return () => clearInterval(interval);
     }
   }, [isConnected]);
-
-  const handleMute = () => {
-    toggleMute();
-    setIsMuted(!isMuted);
-  };
-
-  const handleVideo = () => {
-    toggleVideo();
-    setIsVideoEnabled(!isVideoEnabled);
-  };
 
   const handleEndCall = () => {
     endCall();
@@ -107,7 +116,7 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
           {/* Local Video (small window) */}
           <div className="absolute top-4 right-4 w-24 h-32 bg-black/50 rounded-lg overflow-hidden flex items-center justify-center">
             <div className="text-xs text-white/70 text-center">
-              Your video
+              Your video {isWebcamOn ? '(On)' : '(Off)'}
             </div>
           </div>
         </div>
@@ -132,11 +141,14 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
 
       {/* Debug info */}
       <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-lg rounded-lg p-2 text-xs">
+        <p>VideoSDK Loaded: {window.VideoSDK ? 'Yes' : 'No'}</p>
         <p>Token: {token ? 'Available' : 'Loading...'}</p>
         <p>Meeting ID: {meetingId || 'Not set'}</p>
         <p>Participants: {participants.length}</p>
         <p>Connecting: {isConnecting ? 'Yes' : 'No'}</p>
         <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
+        <p>Mic: {isMicOn ? 'On' : 'Off'}</p>
+        <p>Webcam: {isWebcamOn ? 'On' : 'Off'}</p>
       </div>
 
       {/* Call Info */}
@@ -150,10 +162,10 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
           
           <h2 className="text-2xl font-bold mb-2">{contact.name}</h2>
           <p className="text-lg text-white/70">
-            {isConnecting ? 'Connecting...' : isConnected ? formatDuration(callDuration) : 'Initiating call...'}
+            {isConnecting ? 'Connecting...' : isConnected ? formatDuration(callDuration) : 'Initializing...'}
           </p>
           <p className="text-sm text-white/50 mt-1">
-            {contact.callType === 'video' ? 'Video Call' : 'Voice Call'} • VideoSDK
+            {contact.callType === 'video' ? 'Video Call' : 'Voice Call'} • VideoSDK JS
           </p>
           {participants.length > 0 && (
             <p className="text-xs text-white/40 mt-2">
@@ -166,14 +178,14 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
         <div className="flex items-center justify-center space-x-6 mt-auto">
           {/* Mute */}
           <Button
-            onClick={handleMute}
+            onClick={toggleMute}
             variant="ghost"
             size="icon"
             className={`w-14 h-14 rounded-full ${
-              isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-white/20 hover:bg-white/30'
+              !isMicOn ? 'bg-red-500 hover:bg-red-600' : 'bg-white/20 hover:bg-white/30'
             }`}
           >
-            {isMuted ? (
+            {!isMicOn ? (
               <MicOff className="h-6 w-6 text-white" />
             ) : (
               <Mic className="h-6 w-6 text-white" />
@@ -207,14 +219,14 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
         {contact.callType === 'video' && (
           <div className="flex items-center justify-center space-x-4 mt-6">
             <Button
-              onClick={handleVideo}
+              onClick={toggleVideo}
               variant="ghost"
               size="icon"
               className={`w-12 h-12 rounded-full ${
-                !isVideoEnabled ? 'bg-red-500 hover:bg-red-600' : 'bg-white/20 hover:bg-white/30'
+                !isWebcamOn ? 'bg-red-500 hover:bg-red-600' : 'bg-white/20 hover:bg-white/30'
               }`}
             >
-              {isVideoEnabled ? (
+              {isWebcamOn ? (
                 <Video className="h-5 w-5 text-white" />
               ) : (
                 <VideoOff className="h-5 w-5 text-white" />
@@ -235,24 +247,6 @@ const CallInterfaceContent: React.FC<CallInterfaceProps> = ({ contact, chatId, o
         )}
       </div>
     </div>
-  );
-};
-
-const CallInterface: React.FC<CallInterfaceProps> = (props) => {
-  const [meetingConfig, setMeetingConfig] = useState<{
-    token?: string;
-    meetingId?: string;
-  }>({});
-
-  return (
-    <VideoSDKProvider
-      participantId={props.contact.id}
-      displayName={props.contact.name}
-      token={meetingConfig.token}
-      meetingId={meetingConfig.meetingId}
-    >
-      <CallInterfaceContent {...props} />
-    </VideoSDKProvider>
   );
 };
 

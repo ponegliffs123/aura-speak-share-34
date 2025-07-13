@@ -10,6 +10,7 @@ export const useVideoSDK = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [meetingId, setMeetingId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   // VideoSDK meeting configuration
   const {
@@ -22,7 +23,7 @@ export const useVideoSDK = () => {
     meetingId: currentMeetingId,
   } = useMeeting({
     onMeetingJoined: () => {
-      console.log('Meeting joined successfully');
+      console.log('VideoSDK: Meeting joined successfully');
       setIsConnected(true);
       setIsConnecting(false);
       toast({
@@ -31,16 +32,24 @@ export const useVideoSDK = () => {
       });
     },
     onMeetingLeft: () => {
-      console.log('Meeting left');
+      console.log('VideoSDK: Meeting left');
       setIsConnected(false);
       setIsConnecting(false);
       setMeetingId(null);
     },
     onParticipantJoined: (participant) => {
-      console.log('Participant joined:', participant.displayName);
+      console.log('VideoSDK: Participant joined:', participant.displayName);
+      toast({
+        title: "Participant joined",
+        description: `${participant.displayName} joined the call`,
+      });
     },
     onParticipantLeft: (participant) => {
-      console.log('Participant left:', participant.displayName);
+      console.log('VideoSDK: Participant left:', participant.displayName);
+      toast({
+        title: "Participant left",
+        description: `${participant.displayName} left the call`,
+      });
     },
     onError: (error) => {
       console.error('VideoSDK error:', error);
@@ -73,32 +82,33 @@ export const useVideoSDK = () => {
 
   const startCall = useCallback(async (contactId: string, chatId: string, callType: 'voice' | 'video') => {
     try {
-      console.log('Starting VideoSDK call:', { contactId, chatId, callType });
+      console.log('VideoSDK: Starting call:', { contactId, chatId, callType });
       setIsConnecting(true);
 
-      // Create a new meeting
+      // Create a new meeting and get token
       const meetingData = await createMeeting();
+      console.log('VideoSDK: Meeting created:', meetingData);
+      
       setMeetingId(meetingData.meetingId);
+      setToken(meetingData.token);
 
       // Send meeting invitation through Supabase realtime
       // This will be handled by the existing realtime infrastructure
       
-      // Join the meeting
-      join();
-
-      console.log('VideoSDK call initiated with meeting ID:', meetingData.meetingId);
+      // Join the meeting (this will happen in VideoSDKProvider when token is available)
+      console.log('VideoSDK: About to join meeting with token');
 
     } catch (error) {
-      console.error('VideoSDK call failed:', error);
+      console.error('VideoSDK: Call failed:', error);
       setIsConnecting(false);
       
       toast({
         title: "Call failed",
-        description: "Could not start video call. Please try again.",
+        description: error.message || "Could not start video call. Please try again.",
         variant: "destructive",
       });
     }
-  }, [createMeeting, join, toast]);
+  }, [createMeeting, toast]);
 
   const endCall = useCallback(() => {
     console.log('Ending VideoSDK call');
@@ -120,6 +130,14 @@ export const useVideoSDK = () => {
     .filter(p => p.id !== localParticipant?.id && p.webcamOn);
   const remoteStream = remoteStreams[0] || null;
 
+  // Auto-join when token and meetingId are available
+  useEffect(() => {
+    if (token && meetingId && !isConnected && !isConnecting) {
+      console.log('VideoSDK: Auto-joining meeting with ID:', meetingId);
+      join();
+    }
+  }, [token, meetingId, isConnected, isConnecting, join]);
+
   return {
     startCall,
     endCall,
@@ -129,7 +147,8 @@ export const useVideoSDK = () => {
     isConnecting,
     localStream,
     remoteStream,
-    meetingId: currentMeetingId,
+    meetingId: currentMeetingId || meetingId,
     participants: Array.from(participants.values()),
+    token,
   };
 };
