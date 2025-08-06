@@ -208,7 +208,7 @@ export const useChats = () => {
     
     fetchTimeoutRef.current = setTimeout(() => {
       fetchChats();
-    }, 500); // 500ms debounce
+    }, 1000); // Increased to 1000ms debounce
   }, [fetchChats]);
 
   useEffect(() => {
@@ -217,7 +217,7 @@ export const useChats = () => {
 
       // Set up real-time subscription for chat updates with debouncing
       const channel = supabase
-        .channel(`chat-changes-${user.id}`)
+        .channel(`chat-changes-${user.id}-${Date.now()}`) // Add timestamp to ensure unique channel
         .on(
           'postgres_changes',
           {

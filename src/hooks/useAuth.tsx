@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -21,22 +21,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const lastAuthEventRef = useRef<string>('');
+  const authEventTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state change:', event, session?.user?.id);
+        const eventKey = `${event}-${session?.user?.id || 'none'}-${Date.now()}`;
         
-        // Handle rate limiting errors gracefully
+        // Prevent duplicate rapid auth events
+        if (lastAuthEventRef.current === `${event}-${session?.user?.id || 'none'}` && 
+            authEventTimeoutRef.current) {
+          console.log('Duplicate auth event prevented:', event);
+          return;
+        }
+        
+        console.log('Auth state change:', event, session?.user?.id);
+        lastAuthEventRef.current = `${event}-${session?.user?.id || 'none'}`;
+        
+        // Clear previous timeout
+        if (authEventTimeoutRef.current) {
+          clearTimeout(authEventTimeoutRef.current);
+        }
+        
+        // Set new timeout to reset duplicate prevention
+        authEventTimeoutRef.current = setTimeout(() => {
+          lastAuthEventRef.current = '';
+          authEventTimeoutRef.current = null;
+        }, 1000);
+        
+        // Handle different auth events
         if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
           setSession(session);
           setUser(session?.user ?? null);
+          setLoading(false);
         } else if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUser(null);
+          // Only sign out if it's not due to rate limiting
+          const wasRateLimit = session === null && user !== null;
+          if (!wasRateLimit) {
+            setSession(null);
+            setUser(null);
+          } else {
+            console.warn('Preventing sign out due to rate limiting');
+            return;
+          }
+          setLoading(false);
+        } else {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -56,7 +89,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (authEventTimeoutRef.current) {
+        clearTimeout(authEventTimeoutRef.current);
+      }
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
