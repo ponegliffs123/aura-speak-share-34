@@ -26,16 +26,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        console.log('Auth state change:', event, session?.user?.id);
+        
+        // Handle rate limiting errors gracefully
+        if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+          setSession(session);
+          setUser(session?.user ?? null);
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+        }
         setLoading(false);
       }
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.warn('Error getting session:', error);
+        // Don't sign out user for rate limiting errors
+        if (!error.message?.includes('429') && !error.message?.includes('Too Many Requests')) {
+          setSession(null);
+          setUser(null);
+        }
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
       setLoading(false);
     });
 

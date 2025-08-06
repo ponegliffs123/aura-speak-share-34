@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -32,12 +32,22 @@ export const useChats = () => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isRequestInProgressRef = useRef(false);
 
-  const fetchChats = async () => {
+  const fetchChats = useCallback(async (force = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
+
+    // Prevent multiple simultaneous requests
+    if (isRequestInProgressRef.current && !force) {
+      console.log('Request already in progress, skipping fetch');
+      return;
+    }
+
+    isRequestInProgressRef.current = true;
 
     try {
       console.log('Fetching chats for user:', user.id);
@@ -48,6 +58,13 @@ export const useChats = () => {
 
       if (error) {
         console.error('Error fetching chats:', error);
+        
+        // Handle rate limiting specifically
+        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+          console.warn('Rate limited, backing off...');
+          return; // Don't show error toast for rate limiting
+        }
+        
         if (!error.message.includes('policy') && !error.message.includes('recursion')) {
           toast({
             title: "Error",
@@ -60,13 +77,21 @@ export const useChats = () => {
         console.log('Chats fetched successfully:', data?.length || 0, data);
         setChats(data || []);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error fetching chats:', error);
+      
+      // Handle rate limiting at the network level
+      if (error.message?.includes('429') || error.status === 429) {
+        console.warn('Rate limited, backing off...');
+        return;
+      }
+      
       setChats([]);
     } finally {
       setLoading(false);
+      isRequestInProgressRef.current = false;
     }
-  };
+  }, [user, toast]);
 
   const createOrGetDMChat = async (otherUserId: string): Promise<string | null> => {
     if (!user) {
@@ -101,7 +126,7 @@ export const useChats = () => {
 
         if (existingChat) {
           console.log('Found existing chat:', existingChat.id);
-          await fetchChats(); // Refresh chats list
+          debouncedFetchChats(); // Refresh chats list
           return existingChat.id;
         }
       }
@@ -128,7 +153,7 @@ export const useChats = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Refresh chats after creating new one
-      await fetchChats();
+      await fetchChats(true); // Force refresh for new chat creation
       
       return data;
     } catch (error) {
@@ -167,21 +192,32 @@ export const useChats = () => {
         }
       } else {
         console.log('Message sent successfully');
-        // Refresh chats to update last message
-        await fetchChats();
+        // Refresh chats to update last message with debouncing
+        debouncedFetchChats();
       }
     } catch (error) {
       console.error('Unexpected error sending message:', error);
     }
   };
 
+  // Debounced fetch function to prevent excessive requests
+  const debouncedFetchChats = useCallback(() => {
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchChats();
+    }, 500); // 500ms debounce
+  }, [fetchChats]);
+
   useEffect(() => {
     if (user) {
-      fetchChats();
+      fetchChats(true); // Initial fetch
 
-      // Set up real-time subscription for chat updates
+      // Set up real-time subscription for chat updates with debouncing
       const channel = supabase
-        .channel('chat-changes')
+        .channel(`chat-changes-${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -191,7 +227,7 @@ export const useChats = () => {
           },
           () => {
             console.log('Messages changed, refreshing chats');
-            fetchChats();
+            debouncedFetchChats();
           }
         )
         .on(
@@ -203,7 +239,7 @@ export const useChats = () => {
           },
           () => {
             console.log('Chats changed, refreshing');
-            fetchChats();
+            debouncedFetchChats();
           }
         )
         .on(
@@ -215,19 +251,22 @@ export const useChats = () => {
           },
           () => {
             console.log('Chat participants changed, refreshing');
-            fetchChats();
+            debouncedFetchChats();
           }
         )
         .subscribe();
 
       return () => {
+        if (fetchTimeoutRef.current) {
+          clearTimeout(fetchTimeoutRef.current);
+        }
         supabase.removeChannel(channel);
       };
     } else {
       setChats([]);
       setLoading(false);
     }
-  }, [user]);
+  }, [user, fetchChats, debouncedFetchChats]);
 
   return {
     chats,

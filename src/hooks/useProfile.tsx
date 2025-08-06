@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -18,13 +18,21 @@ export const useProfile = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const isRequestInProgressRef = useRef(false);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
       setLoading(false);
       return;
     }
+
+    // Prevent multiple simultaneous requests
+    if (isRequestInProgressRef.current) {
+      return;
+    }
+
+    isRequestInProgressRef.current = true;
 
     try {
       const { data, error } = await supabase
@@ -34,6 +42,11 @@ export const useProfile = () => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
+        // Handle rate limiting specifically
+        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+          console.warn('Profile fetch rate limited, backing off...');
+          return;
+        }
         throw error;
       }
 
@@ -63,8 +76,15 @@ export const useProfile = () => {
           setProfile(newProfile);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching profile:', error);
+      
+      // Handle rate limiting at the network level
+      if (error.message?.includes('429') || error.status === 429) {
+        console.warn('Profile fetch rate limited, backing off...');
+        return;
+      }
+      
       toast({
         title: "Error",
         description: "Failed to load profile",
@@ -72,8 +92,9 @@ export const useProfile = () => {
       });
     } finally {
       setLoading(false);
+      isRequestInProgressRef.current = false;
     }
-  };
+  }, [user, toast]);
 
   const updateProfile = async (updates: Partial<Profile>, customMessage?: string) => {
     if (!user) return;
