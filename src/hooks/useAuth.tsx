@@ -25,36 +25,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const authEventTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    let isUnmounted = false;
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        const eventKey = `${event}-${session?.user?.id || 'none'}-${Date.now()}`;
+        if (isUnmounted) return;
         
-        // Prevent duplicate rapid auth events
-        if (lastAuthEventRef.current === `${event}-${session?.user?.id || 'none'}` && 
-            authEventTimeoutRef.current) {
-          console.log('Duplicate auth event prevented:', event);
+        const userId = session?.user?.id || 'none';
+        const eventKey = `${event}-${userId}`;
+        
+        // Prevent rapid duplicate events within 2 seconds
+        if (lastAuthEventRef.current === eventKey) {
+          console.log('Duplicate auth event prevented:', event, userId);
           return;
         }
         
-        console.log('Auth state change:', event, session?.user?.id);
-        lastAuthEventRef.current = `${event}-${session?.user?.id || 'none'}`;
+        console.log('Auth state change:', event, userId);
+        lastAuthEventRef.current = eventKey;
         
         // Clear previous timeout
         if (authEventTimeoutRef.current) {
           clearTimeout(authEventTimeoutRef.current);
         }
         
-        // Set new timeout to reset duplicate prevention
+        // Set timeout to reset duplicate prevention after 2 seconds
         authEventTimeoutRef.current = setTimeout(() => {
-          lastAuthEventRef.current = '';
-          authEventTimeoutRef.current = null;
-        }, 1000);
+          if (!isUnmounted) {
+            lastAuthEventRef.current = '';
+            authEventTimeoutRef.current = null;
+          }
+        }, 2000);
         
-        // Handle different auth events
-        if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        // Handle different auth events with more strict conditions
+        if (event === 'SIGNED_IN') {
           setSession(session);
           setUser(session?.user ?? null);
+          setLoading(false);
+        } else if (event === 'TOKEN_REFRESHED') {
+          // Only update if we actually have a valid session
+          if (session && session.user) {
+            setSession(session);
+            setUser(session.user);
+          }
           setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           // Only sign out if it's not due to rate limiting
@@ -63,9 +76,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setSession(null);
             setUser(null);
           } else {
-            console.warn('Preventing sign out due to rate limiting');
+            console.warn('Prevented sign out due to rate limiting, retaining user session');
             return;
           }
+          setLoading(false);
+        } else if (event === 'INITIAL_SESSION') {
+          setSession(session);
+          setUser(session?.user ?? null);
           setLoading(false);
         } else {
           setLoading(false);
@@ -75,6 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (isUnmounted) return;
+      
       if (error) {
         console.warn('Error getting session:', error);
         // Don't sign out user for rate limiting errors
@@ -90,6 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
+      isUnmounted = true;
       subscription.unsubscribe();
       if (authEventTimeoutRef.current) {
         clearTimeout(authEventTimeoutRef.current);

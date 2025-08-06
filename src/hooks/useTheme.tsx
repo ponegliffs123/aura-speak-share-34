@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { useProfile } from './useProfile';
+import { useAuth } from './useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 type Theme = 'dark' | 'light' | 'system';
 
@@ -28,16 +29,35 @@ export function ThemeProvider({
   storageKey = 'ui-theme',
   ...props
 }: ThemeProviderProps) {
-  const { profile, updateProfile } = useProfile();
+  const { user } = useAuth();
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
+  const [userTheme, setUserTheme] = useState<Theme | null>(null);
 
+  // Fetch user's theme preference from profile when user is available
   useEffect(() => {
-    if (profile?.theme_preference) {
-      setTheme(profile.theme_preference as Theme);
+    if (user && !userTheme) {
+      const fetchUserTheme = async () => {
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('theme_preference')
+            .eq('id', user.id)
+            .single();
+          
+          if (data?.theme_preference) {
+            setUserTheme(data.theme_preference as Theme);
+            setTheme(data.theme_preference as Theme);
+          }
+        } catch (error) {
+          console.warn('Error fetching user theme:', error);
+        }
+      };
+      
+      fetchUserTheme();
     }
-  }, [profile]);
+  }, [user, userTheme]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -59,11 +79,21 @@ export function ThemeProvider({
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
+    setTheme: async (theme: Theme) => {
       localStorage.setItem(storageKey, theme);
       setTheme(theme);
-      if (profile) {
-        updateProfile({ theme_preference: theme });
+      setUserTheme(theme);
+      
+      // Update user's profile theme preference
+      if (user) {
+        try {
+          await supabase
+            .from('profiles')
+            .update({ theme_preference: theme })
+            .eq('id', user.id);
+        } catch (error) {
+          console.warn('Error updating user theme:', error);
+        }
       }
     },
   };
